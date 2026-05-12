@@ -58,9 +58,10 @@ export default function AyahText({
   }
 
   // The QPC v4 word data already includes the end-of-ayah marker glyph,
-  // so don't duplicate it with the standalone marker prop.
+  // so don't duplicate it with the standalone marker prop. The qpc-tajweed
+  // class lets dark-mode CSS swap to the font's white-base palette.
   return (
-    <p className={className} dir={dir}>
+    <p className={`${className ?? ""} qpc-tajweed`.trim()} dir={dir}>
       {runs.map((run, i) => (
         <span
           key={i}

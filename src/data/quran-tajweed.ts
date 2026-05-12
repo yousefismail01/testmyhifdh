@@ -19,13 +19,20 @@ export function getTajweedRuns(surah: number, ayah: number): TajweedRun[] {
  * Lazy-register the per-page font face. Each page's font file contains the
  * specific glyphs for that page's PUA codepoints, so a word from page N
  * only renders correctly with the `qpc-v4-p{N}` family.
+ *
+ * The QPC v4 font ships 6 CPAL palettes:
+ *   palette 0 — default (black base text + tajweed accent colors)
+ *   palette 1 — white base text + slightly adjusted tajweed colors (dark UI)
+ * We also register a `--tajweed-dark` font-palette-values rule pointing at
+ * palette 1, so a single CSS `font-palette: --tajweed-dark` declaration
+ * picks the right palette for whichever page font is active.
  */
 export function ensurePageFont(page: number): void {
   if (loadedFonts.has(page)) return;
   loadedFonts.add(page);
   if (typeof document === "undefined" || !("fonts" in document)) return;
+  const family = `qpc-v4-p${page}`;
   try {
-    const family = `qpc-v4-p${page}`;
     const face = new FontFace(
       family,
       `url(/fonts/qpc-v4/p${page}.woff2) format("woff2")`,
@@ -34,6 +41,13 @@ export function ensurePageFont(page: number): void {
     document.fonts.add(face);
     void face.load();
   } catch {
-    /* fontface unsupported or quota — degrade gracefully */
+    /* fontface unsupported — degrade gracefully */
+  }
+  try {
+    const style = document.createElement("style");
+    style.textContent = `@font-palette-values --tajweed-dark { font-family: "${family}"; base-palette: 1; }`;
+    document.head.appendChild(style);
+  } catch {
+    /* font-palette-values unsupported — non-fatal */
   }
 }
