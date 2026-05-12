@@ -691,12 +691,9 @@ export default function QuizScreen({
                       !promptOnly &&
                       showsBismillahHeader(currentAyah.surah, currentAyah.ayah);
                     return (
-                      <div
-                        data-wheel-card
-                        className="wheel-card"
-                      >
+                      <>
                         {hasBismillahHeader && (
-                          <div className="text-center mb-3 animate-fade-in-soft">
+                          <div className="text-center my-4 animate-fade-in-soft">
                             <span
                               className={`bismillah-glyph ${sizes.bismillah} text-neutral-700 dark:text-neutral-200`}
                               dir="rtl"
@@ -705,7 +702,10 @@ export default function QuizScreen({
                             </span>
                           </div>
                         )}
-                        <div className="bg-white dark:bg-neutral-900 rounded-3xl border-2 border-neutral-900/10 dark:border-neutral-100/15 p-7 ring-1 ring-neutral-900/5 dark:ring-neutral-100/10">
+                        <div
+                          data-wheel-card
+                          className="wheel-card bg-white dark:bg-neutral-900 rounded-3xl border-2 border-neutral-900/10 dark:border-neutral-100/15 p-7 ring-1 ring-neutral-900/5 dark:ring-neutral-100/10"
+                        >
                           {!hideSurahName && !promptOnly && (
                             <div className="text-center mb-4 flex items-center justify-center gap-2">
                               <span className="text-xs font-medium text-neutral-700 dark:text-neutral-200 bg-neutral-100 dark:bg-neutral-800 px-3 py-1 rounded-full">
@@ -742,7 +742,7 @@ export default function QuizScreen({
                             </p>
                           )}
                         </div>
-                      </div>
+                      </>
                     );
                   })()}
 
@@ -752,13 +752,9 @@ export default function QuizScreen({
                     ra.ayah
                   );
                   return (
-                    <div
-                      key={i}
-                      data-wheel-card
-                      className="wheel-card animate-fade-in-soft"
-                    >
+                    <div key={i} className="contents">
                       {hasBismillahHeader && (
-                        <div className="text-center mb-3">
+                        <div className="text-center my-4 animate-fade-in-soft">
                           {!hideSurahName && (
                             <div className="text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-1.5">
                               {surahs[ra.surah - 1].nameArabic} —{" "}
@@ -773,7 +769,10 @@ export default function QuizScreen({
                           </span>
                         </div>
                       )}
-                      <div className="bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-6">
+                      <div
+                        data-wheel-card
+                        className="wheel-card animate-fade-in-soft bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-6"
+                      >
                         {!hideSurahName && (
                           <div className="text-center mb-3 flex items-center justify-center gap-2">
                             <span className="text-xs text-neutral-400 dark:text-neutral-500">
