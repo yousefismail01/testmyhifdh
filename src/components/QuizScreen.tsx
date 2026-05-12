@@ -384,10 +384,8 @@ export default function QuizScreen({
       if (!sc) return;
       const cards = sc.querySelectorAll<HTMLElement>("[data-wheel-card]");
       if (cards.length === 0) return;
-      const scH = sc.clientHeight;
       const scRect = sc.getBoundingClientRect();
 
-      // Reset transforms before measuring so we read natural positions.
       cards.forEach((card) => {
         card.style.transform = "";
         card.style.opacity = "1";
@@ -395,7 +393,6 @@ export default function QuizScreen({
       });
       void sc.offsetHeight;
 
-      // Read each card's natural top + height relative to the scroller.
       const tops: number[] = [];
       const heights: number[] = [];
       cards.forEach((card) => {
@@ -404,13 +401,11 @@ export default function QuizScreen({
         heights.push(r.height);
       });
 
-      const PEEK = 16; // visible peek per stacked card
+      const PEEK = 16;
       const STACK_DEPTH = 5;
       const stackBandHeight = STACK_DEPTH * PEEK;
 
-      // Find the first card whose bottom is below the stack band — that's
-      // the topmost in-view card. Cards before it have been scrolled past
-      // and pile up at the top.
+      // Topmost card whose bottom is past the stack band — first in view.
       let firstInViewIdx = 0;
       for (let i = 0; i < tops.length; i++) {
         if (tops[i] + heights[i] > stackBandHeight) {
@@ -427,22 +422,18 @@ export default function QuizScreen({
         let zIndex = 1000;
 
         if (i < firstInViewIdx) {
-          // Scrolled past — stack at the top of the viewport.
-          const stackOffset = firstInViewIdx - i; // 1 = most recent past
+          // Scrolled past — pile up at the top of the viewport.
+          const stackOffset = firstInViewIdx - i;
           if (stackOffset > STACK_DEPTH) {
             opacity = 0;
           } else {
-            // slot 0 = oldest visible (top of stack), STACK_DEPTH-1 = freshest
             const slot = STACK_DEPTH - stackOffset;
             const targetTop = slot * PEEK;
             ty = targetTop - tops[i];
-            // Deeper slots are smaller; freshest (highest slot) stays full size.
             scale = 1 - (STACK_DEPTH - 1 - slot) * 0.02;
-            // Freshest on top of the stack pile.
             zIndex = 800 + slot;
           }
         }
-        // Cards at or after firstInViewIdx render in natural flow.
 
         card.style.transformOrigin = "center";
         card.style.transform = `translateY(${ty}px) scale(${scale})`;
