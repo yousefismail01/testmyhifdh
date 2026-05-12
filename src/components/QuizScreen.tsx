@@ -385,42 +385,40 @@ export default function QuizScreen({
       const cards = sc.querySelectorAll<HTMLElement>("[data-wheel-card]");
       if (cards.length === 0) return;
       const scH = sc.clientHeight;
-      const maxScroll = Math.max(0, sc.scrollHeight - scH);
-      const progress = maxScroll < 1 ? 0 : sc.scrollTop / maxScroll;
       const scRect = sc.getBoundingClientRect();
 
-      // Use offsetTop (transform-free) to compute each card's natural vertical center
-      // within the scroll content, then map to viewport Y.
+      // Reset transforms before measuring so we read natural positions.
+      cards.forEach((card) => {
+        card.style.transform = "";
+        card.style.opacity = "1";
+      });
+      void sc.offsetHeight;
+
+      // Compute each card's center relative to the scroller viewport.
       const centers: number[] = [];
       cards.forEach((card) => {
-        let top = 0;
-        let cur: HTMLElement | null = card;
-        while (cur && cur !== sc) {
-          top += cur.offsetTop;
-          cur = cur.offsetParent as HTMLElement | null;
-        }
-        const naturalCenterInContent = top + card.offsetHeight / 2;
-        centers.push(scRect.top + naturalCenterInContent - sc.scrollTop);
+        const r = card.getBoundingClientRect();
+        centers.push(r.top - scRect.top + r.height / 2);
       });
 
-      const firstCenter = centers[0];
-      const lastCenter = centers[centers.length - 1];
-      const focusY = firstCenter + progress * (lastCenter - firstCenter);
-
+      // Soft stacking: cards inside the viewport stay flat. Cards heading
+      // out of either edge progressively shrink and fade, so they feel
+      // like they're stacking behind the visible ones.
+      const viewportCenter = scH / 2;
       cards.forEach((card, i) => {
-        // Tighter focus zone: cards reach full rotation closer to focus,
-        // so every card visible in the viewport noticeably curves rather
-        // than just the topmost extreme.
-        const dist = (centers[i] - focusY) / (scH / 3.5);
-        const clamped = Math.max(-1.4, Math.min(1.4, dist));
-        const rotateX = -clamped * 55;
-        const scale = 1 - Math.abs(clamped) * 0.18;
-        const translateZ = -Math.abs(clamped) * 100;
-        // Hinge cards at the edge nearest the focus point so adjacent cards
-        // stay visually connected at their shared edges.
-        card.style.transformOrigin =
-          dist < 0 ? "center bottom" : dist > 0 ? "center top" : "center";
-        card.style.transform = `translateZ(${translateZ}px) rotateX(${rotateX}deg) scale(${scale})`;
+        const cardCenter = centers[i];
+        // Normalized distance from viewport center (0 = center, 0.5 = edge).
+        const dist = Math.abs(cardCenter - viewportCenter) / scH;
+        let scale = 1;
+        let opacity = 1;
+        if (dist > 0.35) {
+          const t = Math.min(1.2, (dist - 0.35) / 0.5);
+          scale = 1 - t * 0.18;
+          opacity = Math.max(0, 1 - t * 1.1);
+        }
+        card.style.transformOrigin = "center";
+        card.style.transform = `scale(${scale})`;
+        card.style.opacity = String(opacity);
       });
     });
   }, []);
