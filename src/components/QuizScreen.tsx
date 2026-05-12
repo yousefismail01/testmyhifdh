@@ -96,14 +96,41 @@ export default function QuizScreen({ range, onBack }: Props) {
     }
   }, [ayahPool, rollNewAyah]);
 
-  useEffect(() => {
-    if (revealedAyahs.length === 0 || !scrollerRef.current) return;
+  const updateWheel = useCallback(() => {
     const sc = scrollerRef.current;
-    sc.scrollTo({
-      top: sc.scrollHeight,
-      behavior: "smooth",
+    if (!sc) return;
+    const cards = sc.querySelectorAll<HTMLElement>("[data-wheel-card]");
+    const r = sc.getBoundingClientRect();
+    const scH = sc.clientHeight;
+    const scCenter = r.top + scH / 2;
+    cards.forEach((card) => {
+      const cr = card.getBoundingClientRect();
+      const cardCenter = cr.top + cr.height / 2;
+      const dist = (cardCenter - scCenter) / (scH / 2);
+      const clamped = Math.max(-1.4, Math.min(1.4, dist));
+      const rotateX = -clamped * 38;
+      const scale = 1 - Math.abs(clamped) * 0.12;
+      const translateZ = -Math.abs(clamped) * 80;
+      card.style.transform = `translateZ(${translateZ}px) rotateX(${rotateX}deg) scale(${scale})`;
     });
-  }, [revealedAyahs.length]);
+  }, []);
+
+  useEffect(() => {
+    if (!scrollerRef.current) return;
+    const sc = scrollerRef.current;
+    if (revealedAyahs.length === 0) {
+      sc.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      sc.scrollTo({ top: sc.scrollHeight, behavior: "smooth" });
+    }
+    requestAnimationFrame(updateWheel);
+  }, [revealedAyahs.length, currentAyah, updateWheel]);
+
+  useEffect(() => {
+    updateWheel();
+    window.addEventListener("resize", updateWheel);
+    return () => window.removeEventListener("resize", updateWheel);
+  }, [updateWheel]);
 
   const advanceOne = (
     ref: AyahReference
@@ -326,123 +353,129 @@ export default function QuizScreen({ range, onBack }: Props) {
             key={currentAyah ? `${currentAyah.surah}:${currentAyah.ayah}` : "x"}
             className="flex flex-col flex-1 min-h-0"
           >
-            <div className="shrink-0">
-            {(() => {
-              const { text: cleanText, hadBismillah } =
-                currentAyah && !promptOnly
-                  ? stripBismillah(ayahText, currentAyah.surah, currentAyah.ayah)
-                  : { text: ayahText, hadBismillah: false };
-              return (
-                <>
-                  {hadBismillah && (
-                    <div className="text-center mb-6 mt-2 animate-fade-in-soft">
-                      <span
-                        className="bismillah-glyph text-3xl text-neutral-700"
-                        dir="rtl"
-                      >
-                        {BISMILLAH_DISPLAY}
-                      </span>
-                    </div>
-                  )}
-                  <div className="bg-white rounded-3xl border border-neutral-200 p-8 mb-4 animate-slide-up">
-                    {currentAyah && !hideSurahName && !promptOnly && (
-                      <div className="text-center mb-5 flex items-center justify-center gap-2">
-                        <span className="text-xs font-medium text-neutral-600 bg-neutral-50 px-3 py-1 rounded-full border border-neutral-200">
-                          {currentSurahInfo!.nameArabic} —{" "}
-                          {currentSurahInfo!.name} : {currentAyah.ayah}
-                        </span>
-                        {isLastAyah && (
-                          <span className="text-xs font-medium text-rose-700 bg-rose-50 px-3 py-1 rounded-full border border-rose-100">
-                            Last ayah
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    {promptOnly ? (
-                      <div className="text-center py-8">
-                        <div className="text-xs uppercase tracking-widest text-neutral-400 mb-4">
-                          What's the first ayah of
-                        </div>
-                        <div className="font-quran text-6xl text-neutral-900 mb-2">
-                          {currentSurahInfo!.nameArabic}
-                        </div>
-                        <div className="text-neutral-500 text-base">
-                          {currentSurahInfo!.name}
-                        </div>
-                      </div>
-                    ) : (
-                      <p
-                        className="font-quran text-3xl leading-[2.4] text-neutral-900 text-right"
-                        dir="rtl"
-                      >
-                        {cleanText}
-                      </p>
-                    )}
-                  </div>
-                </>
-              );
-            })()}
-            </div>
-
-            {revealedAyahs.length > 0 && (
-              <div
-                ref={scrollerRef}
-                className="reveal-mask scrollbar-hide flex-1 min-h-0 overflow-y-auto -mx-4 px-4"
-              >
-                <div className="space-y-3 py-4">
-                  {revealedAyahs.map((ra, i) => {
-                    const { text: cleanText, hadBismillah } = stripBismillah(
-                      ra.text,
-                      ra.surah,
-                      ra.ayah
-                    );
+            <div
+              ref={scrollerRef}
+              onScroll={updateWheel}
+              className="reveal-mask scrollbar-hide flex-1 min-h-0 overflow-y-auto -mx-4 px-4"
+            >
+              <div className="space-y-3 py-12">
+                {currentAyah &&
+                  (() => {
+                    const { text: cleanText, hadBismillah } = !promptOnly
+                      ? stripBismillah(
+                          ayahText,
+                          currentAyah.surah,
+                          currentAyah.ayah
+                        )
+                      : { text: ayahText, hadBismillah: false };
                     return (
-                      <div key={i} className="animate-slide-up">
+                      <div
+                        data-wheel-card
+                        className="wheel-card"
+                      >
                         {hadBismillah && (
-                          <div className="text-center mb-3">
-                            {!hideSurahName && (
-                              <div className="text-xs uppercase tracking-widest text-neutral-400 mb-1.5">
-                                {surahs[ra.surah - 1].nameArabic} —{" "}
-                                {surahs[ra.surah - 1].name}
-                              </div>
-                            )}
+                          <div className="text-center mb-3 animate-fade-in-soft">
                             <span
-                              className="bismillah-glyph text-2xl text-neutral-700"
+                              className="bismillah-glyph text-3xl text-neutral-700"
                               dir="rtl"
                             >
                               {BISMILLAH_DISPLAY}
                             </span>
                           </div>
                         )}
-                        <div className="bg-white rounded-3xl border border-neutral-200 p-6">
-                          {!hideSurahName && (
-                            <div className="text-center mb-3 flex items-center justify-center gap-2">
-                              <span className="text-xs text-neutral-400">
-                                {surahs[ra.surah - 1].nameArabic} : {ra.ayah}
+                        <div className="bg-white rounded-3xl border-2 border-neutral-900/10 p-7 ring-1 ring-neutral-900/5">
+                          {!hideSurahName && !promptOnly && (
+                            <div className="text-center mb-4 flex items-center justify-center gap-2">
+                              <span className="text-xs font-medium text-neutral-700 bg-neutral-100 px-3 py-1 rounded-full">
+                                {currentSurahInfo!.nameArabic} —{" "}
+                                {currentSurahInfo!.name} : {currentAyah.ayah}
                               </span>
-                              {ra.isEndOfSurah && (
-                                <span className="text-[10px] font-medium text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100">
+                              {isLastAyah && (
+                                <span className="text-xs font-medium text-rose-700 bg-rose-50 px-3 py-1 rounded-full border border-rose-100">
                                   Last ayah
                                 </span>
                               )}
                             </div>
                           )}
-                          <p
-                            className="font-quran text-2xl leading-[2.2] text-neutral-700 text-right"
-                            dir="rtl"
-                          >
-                            {cleanText}
-                          </p>
+
+                          {promptOnly ? (
+                            <div className="text-center py-6">
+                              <div className="text-xs uppercase tracking-widest text-neutral-400 mb-3">
+                                What's the first ayah of
+                              </div>
+                              <div className="font-quran text-5xl text-neutral-900 mb-1">
+                                {currentSurahInfo!.nameArabic}
+                              </div>
+                              <div className="text-neutral-500 text-sm">
+                                {currentSurahInfo!.name}
+                              </div>
+                            </div>
+                          ) : (
+                            <p
+                              className="font-quran text-3xl leading-[2.4] text-neutral-900 text-right"
+                              dir="rtl"
+                            >
+                              {cleanText}
+                            </p>
+                          )}
                         </div>
                       </div>
                     );
-                  })}
-                </div>
-              </div>
-            )}
+                  })()}
 
-            {revealedAyahs.length === 0 && <div className="flex-1" />}
+                {revealedAyahs.map((ra, i) => {
+                  const { text: cleanText, hadBismillah } = stripBismillah(
+                    ra.text,
+                    ra.surah,
+                    ra.ayah
+                  );
+                  return (
+                    <div
+                      key={i}
+                      data-wheel-card
+                      className="wheel-card animate-slide-up"
+                    >
+                      {hadBismillah && (
+                        <div className="text-center mb-3">
+                          {!hideSurahName && (
+                            <div className="text-xs uppercase tracking-widest text-neutral-400 mb-1.5">
+                              {surahs[ra.surah - 1].nameArabic} —{" "}
+                              {surahs[ra.surah - 1].name}
+                            </div>
+                          )}
+                          <span
+                            className="bismillah-glyph text-2xl text-neutral-700"
+                            dir="rtl"
+                          >
+                            {BISMILLAH_DISPLAY}
+                          </span>
+                        </div>
+                      )}
+                      <div className="bg-white rounded-3xl border border-neutral-200 p-6">
+                        {!hideSurahName && (
+                          <div className="text-center mb-3 flex items-center justify-center gap-2">
+                            <span className="text-xs text-neutral-400">
+                              {surahs[ra.surah - 1].nameArabic} : {ra.ayah}
+                            </span>
+                            {ra.isEndOfSurah && (
+                              <span className="text-[10px] font-medium text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100">
+                                Last ayah
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        <p
+                          className="font-quran text-2xl leading-[2.2] text-neutral-700 text-right"
+                          dir="rtl"
+                        >
+                          {cleanText}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
 
             <div className="shrink-0 pt-3">
             <div className="flex gap-3 mb-3">

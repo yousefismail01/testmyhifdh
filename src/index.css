@@ -78,15 +78,24 @@ body {
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent 0,
-    black 48px,
-    black calc(100% - 32px),
+    black 64px,
+    black calc(100% - 64px),
     transparent 100%
   );
   mask-image: linear-gradient(
     to bottom,
     transparent 0,
-    black 48px,
-    black calc(100% - 32px),
+    black 64px,
+    black calc(100% - 64px),
     transparent 100%
   );
+  perspective: 700px;
+  perspective-origin: center center;
+}
+
+.wheel-card {
+  transform-style: preserve-3d;
+  transform-origin: center center;
+  transition: transform 80ms linear, opacity 80ms linear;
+  will-change: transform, opacity;
 }
