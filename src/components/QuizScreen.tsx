@@ -32,6 +32,7 @@ export default function QuizScreen({ range, onBack }: Props) {
 
   const [hideSurahName, setHideSurahName] = useState(false);
   const [testFirstAyahs, setTestFirstAyahs] = useState(false);
+  const [showAyahNumbers, setShowAyahNumbers] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [promptOnly, setPromptOnly] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
@@ -252,6 +253,21 @@ export default function QuizScreen({ range, onBack }: Props) {
   const showsBismillahHeader = (surah: number, ayah: number): boolean =>
     ayah === 1 && surah !== 1 && surah !== 9;
 
+  const toArabicIndic = (n: number): string =>
+    String(n)
+      .split("")
+      .map((d) => String.fromCharCode(0x0660 + parseInt(d, 10)))
+      .join("");
+
+  const renderAyahMarker = (ayahNum: number) => {
+    if (!showAyahNumbers) return null;
+    return (
+      <span className="font-quran text-neutral-400 mx-1 align-baseline">
+        ﴿{toArabicIndic(ayahNum)}﴾
+      </span>
+    );
+  };
+
   const currentSurahInfo = currentAyah ? surahs[currentAyah.surah - 1] : null;
   const isLastAyah =
     currentAyah && currentSurahInfo
@@ -352,6 +368,22 @@ export default function QuizScreen({ range, onBack }: Props) {
                 className="w-5 h-5 accent-neutral-900 shrink-0"
               />
             </label>
+            <label className="flex items-center justify-between cursor-pointer">
+              <div className="pr-4">
+                <div className="text-sm font-medium text-neutral-800">
+                  Show ayah numbers
+                </div>
+                <div className="text-xs text-neutral-400 mt-0.5">
+                  Display an end-of-ayah marker with the ayah number
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={showAyahNumbers}
+                onChange={(e) => setShowAyahNumbers(e.target.checked)}
+                className="w-5 h-5 accent-neutral-900 shrink-0"
+              />
+            </label>
           </div>
         )}
 
@@ -423,6 +455,7 @@ export default function QuizScreen({ range, onBack }: Props) {
                               dir="rtl"
                             >
                               {ayahText}
+                              {renderAyahMarker(currentAyah.ayah)}
                             </p>
                           )}
                         </div>
@@ -475,6 +508,7 @@ export default function QuizScreen({ range, onBack }: Props) {
                           dir="rtl"
                         >
                           {ra.text}
+                          {renderAyahMarker(ra.ayah)}
                         </p>
                       </div>
                     </div>
