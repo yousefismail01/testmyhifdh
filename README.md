@@ -11,7 +11,7 @@ Live at **[testmyhifdh.com](https://testmyhifdh.com)**.
 - **Final ayahs are never the prompt**: the last ayah of any surah is excluded from the random roll (you can still reveal it). This keeps the test honest — if you got rolled the ending, there'd be nothing to recite.
 - **Vertical wheel reveal**: revealed ayahs flow through a fixed-height reel with a soft mask at the top and bottom. Cards curve away at the edges like an iOS picker. The page itself never scrolls.
 - **Calligraphic Bismillah header**: when a reveal crosses into a new surah, the Bismillah is shown once as a ligature (﷽) above the next ayah card — never duplicated inline.
-- **Uthmani script** via the Amiri Quran font, fetched from the alquran.cloud API.
+- **Uthmani script** rendered with the Amiri Quran font over QPC Hafs word-by-word data bundled with the app (no API calls at runtime).
 - **Settings**:
   - *Hide surah names* — for a stricter test where you have to identify the location too.
   - *Test first ayahs* — when the random pick lands on ayah 1, show only the surah name and recall the opening from there.
@@ -21,7 +21,7 @@ Live at **[testmyhifdh.com](https://testmyhifdh.com)**.
 
 - [Vite](https://vitejs.dev/) + React 19 + TypeScript
 - [Tailwind CSS v4](https://tailwindcss.com/)
-- [alquran.cloud API](https://alquran.cloud/api) for Uthmani-script ayah text
+- QPC Hafs word-by-word ayah text (preprocessed into `src/data/ayahs.json`)
 - Deployed on [Vercel](https://vercel.com/) with HTTPS, HSTS, and a locked-down CSP
 
 ## Local development

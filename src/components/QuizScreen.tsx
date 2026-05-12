@@ -230,26 +230,8 @@ export default function QuizScreen({ range, onBack }: Props) {
 
   const BISMILLAH_DISPLAY = "﷽";
 
-  const stripBismillah = (text: string, surah: number, ayah: number) => {
-    if (ayah !== 1 || surah === 1 || surah === 9)
-      return { text, hadBismillah: false };
-    const normalize = (s: string) =>
-      s.replace(/[ً-ٰٟۖ-ۭ]/g, "").replace(/ٱ/g, "ا").replace(/\s/g, "");
-    const bismillahBare = normalize("بسم الله الرحمن الرحيم");
-    const textBare = normalize(text);
-    if (!textBare.startsWith(bismillahBare))
-      return { text, hadBismillah: false };
-    let consumed = 0;
-    let bareCount = 0;
-    for (const ch of text) {
-      const isDiacriticOrSpace = /[ً-ٰٟۖ-ۭ\s]/.test(ch);
-      if (bareCount >= bismillahBare.length && !isDiacriticOrSpace) break;
-      consumed += ch.length;
-      if (!isDiacriticOrSpace) bareCount++;
-    }
-    const stripped = text.slice(consumed).trimStart();
-    return { text: stripped, hadBismillah: true };
-    };
+  const showsBismillahHeader = (surah: number, ayah: number): boolean =>
+    ayah === 1 && surah !== 1 && surah !== 9;
 
   const currentSurahInfo = currentAyah ? surahs[currentAyah.surah - 1] : null;
   const isLastAyah =
@@ -371,19 +353,15 @@ export default function QuizScreen({ range, onBack }: Props) {
               <div className="space-y-4 py-16">
                 {currentAyah &&
                   (() => {
-                    const { text: cleanText, hadBismillah } = !promptOnly
-                      ? stripBismillah(
-                          ayahText,
-                          currentAyah.surah,
-                          currentAyah.ayah
-                        )
-                      : { text: ayahText, hadBismillah: false };
+                    const hasBismillahHeader =
+                      !promptOnly &&
+                      showsBismillahHeader(currentAyah.surah, currentAyah.ayah);
                     return (
                       <div
                         data-wheel-card
                         className="wheel-card"
                       >
-                        {hadBismillah && (
+                        {hasBismillahHeader && (
                           <div className="text-center mb-3 animate-fade-in-soft">
                             <span
                               className="bismillah-glyph text-3xl text-neutral-700"
@@ -425,7 +403,7 @@ export default function QuizScreen({ range, onBack }: Props) {
                               className="font-quran text-3xl leading-[2.4] text-neutral-900 text-right"
                               dir="rtl"
                             >
-                              {cleanText}
+                              {ayahText}
                             </p>
                           )}
                         </div>
@@ -434,8 +412,7 @@ export default function QuizScreen({ range, onBack }: Props) {
                   })()}
 
                 {revealedAyahs.map((ra, i) => {
-                  const { text: cleanText, hadBismillah } = stripBismillah(
-                    ra.text,
+                  const hasBismillahHeader = showsBismillahHeader(
                     ra.surah,
                     ra.ayah
                   );
@@ -445,7 +422,7 @@ export default function QuizScreen({ range, onBack }: Props) {
                       data-wheel-card
                       className="wheel-card animate-slide-up"
                     >
-                      {hadBismillah && (
+                      {hasBismillahHeader && (
                         <div className="text-center mb-3">
                           {!hideSurahName && (
                             <div className="text-xs uppercase tracking-widest text-neutral-400 mb-1.5">
@@ -478,7 +455,7 @@ export default function QuizScreen({ range, onBack }: Props) {
                           className="font-quran text-2xl leading-[2.2] text-neutral-700 text-right"
                           dir="rtl"
                         >
-                          {cleanText}
+                          {ra.text}
                         </p>
                       </div>
                     </div>
