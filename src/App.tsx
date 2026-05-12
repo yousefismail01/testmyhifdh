@@ -12,6 +12,7 @@ export interface Settings {
   hideSurahName: boolean;
   testFirstAyahs: boolean;
   showAyahNumbers: boolean;
+  tajweed: boolean;
 }
 
 export interface SettingsActions {
@@ -20,6 +21,7 @@ export interface SettingsActions {
   setHideSurahName: React.Dispatch<React.SetStateAction<boolean>>;
   setTestFirstAyahs: React.Dispatch<React.SetStateAction<boolean>>;
   setShowAyahNumbers: React.Dispatch<React.SetStateAction<boolean>>;
+  setTajweed: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export default function App() {
@@ -44,6 +46,7 @@ export default function App() {
     "tmh.showAyahNumbers",
     true
   );
+  const [tajweed, setTajweed] = usePersistedState("tmh.tajweed", false);
 
   const settings: Settings = {
     theme,
@@ -51,6 +54,7 @@ export default function App() {
     hideSurahName,
     testFirstAyahs,
     showAyahNumbers,
+    tajweed,
   };
   const actions: SettingsActions = {
     setTheme,
@@ -58,6 +62,7 @@ export default function App() {
     setHideSurahName,
     setTestFirstAyahs,
     setShowAyahNumbers,
+    setTajweed,
   };
 
   useEffect(() => {

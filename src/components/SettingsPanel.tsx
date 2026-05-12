@@ -61,6 +61,22 @@ export default function SettingsPanel({ settings, actions, compact }: Props) {
               className="w-5 h-5 accent-neutral-900 dark:accent-neutral-100 shrink-0"
             />
           </label>
+          <label className="flex items-center justify-between cursor-pointer">
+            <div className="pr-4">
+              <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
+                Tajweed
+              </div>
+              <div className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
+                Render with the QPC v4 tajweed-colored Mushaf font
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={settings.tajweed}
+              onChange={(e) => actions.setTajweed(e.target.checked)}
+              className="w-5 h-5 accent-neutral-900 dark:accent-neutral-100 shrink-0"
+            />
+          </label>
         </>
       )}
 

@@ -18,6 +18,7 @@ import { fetchAyahText } from "../data/quran-api";
 import type { SelectedRange } from "./RangeSelector";
 import type { Settings, SettingsActions, FontSize } from "../App";
 import SettingsPanel from "./SettingsPanel";
+import AyahText from "./AyahText";
 import { juzData } from "../data/quran-meta";
 
 interface Props {
@@ -297,7 +298,13 @@ export default function QuizScreen({
   settings,
   actions,
 }: Props) {
-  const { fontSize, hideSurahName, testFirstAyahs, showAyahNumbers } = settings;
+  const {
+    fontSize,
+    hideSurahName,
+    testFirstAyahs,
+    showAyahNumbers,
+    tajweed,
+  } = settings;
   const [currentAyah, setCurrentAyah] = useState<AyahReference | null>(null);
   const [ayahText, setAyahText] = useState("");
   const [revealedAyahs, setRevealedAyahs] = useState<RevealedAyah[]>([]);
@@ -741,13 +748,14 @@ export default function QuizScreen({
                               </div>
                             </div>
                           ) : (
-                            <p
+                            <AyahText
+                              surah={currentAyah.surah}
+                              ayah={currentAyah.ayah}
+                              plainText={ayahText}
+                              marker={renderAyahMarker(currentAyah.ayah)}
+                              tajweed={tajweed}
                               className={`font-quran ${sizes.current} leading-[2.4] text-neutral-800 dark:text-neutral-200 text-right`}
-                              dir="rtl"
-                            >
-                              {ayahText}
-                              {renderAyahMarker(currentAyah.ayah)}
-                            </p>
+                            />
                           )}
                         </div>
                       </>
@@ -793,13 +801,14 @@ export default function QuizScreen({
                             )}
                           </div>
                         )}
-                        <p
+                        <AyahText
+                          surah={ra.surah}
+                          ayah={ra.ayah}
+                          plainText={ra.text}
+                          marker={renderAyahMarker(ra.ayah)}
+                          tajweed={tajweed}
                           className={`font-quran ${sizes.revealed} leading-[2.2] text-neutral-800 dark:text-neutral-200 text-right`}
-                          dir="rtl"
-                        >
-                          {ra.text}
-                          {renderAyahMarker(ra.ayah)}
-                        </p>
+                        />
                       </div>
                     </Fragment>
                   );
