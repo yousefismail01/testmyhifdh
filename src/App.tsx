@@ -44,6 +44,7 @@ export default function App() {
         <QuizScreen
           range={range}
           onBack={() => setRange(null)}
+          onRangeChange={setRange}
           theme={theme}
           setTheme={setTheme}
           fontSize={fontSize}

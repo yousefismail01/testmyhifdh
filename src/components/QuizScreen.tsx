@@ -11,14 +11,185 @@ import { fetchAyahText } from "../data/quran-api";
 import type { SelectedRange } from "./RangeSelector";
 import { usePersistedState } from "../hooks/usePersistedState";
 import type { Theme, FontSize } from "../App";
+import { juzData } from "../data/quran-meta";
 
 interface Props {
   range: SelectedRange;
   onBack: () => void;
+  onRangeChange: (r: SelectedRange) => void;
   theme: Theme;
   setTheme: (t: Theme) => void;
   fontSize: FontSize;
   setFontSize: (s: FontSize) => void;
+}
+
+function RangePopover({
+  current,
+  onApply,
+  onClose,
+}: {
+  current: SelectedRange;
+  onApply: (r: SelectedRange) => void;
+  onClose: () => void;
+}) {
+  const [mode, setMode] = useState(current.mode);
+  const [juzNumber, setJuzNumber] = useState(current.juzNumber ?? 30);
+  const [startSurah, setStartSurah] = useState(current.startSurah ?? 1);
+  const [endSurah, setEndSurah] = useState(current.endSurah ?? 1);
+  const [startPage, setStartPage] = useState(current.startPage ?? 1);
+  const [endPage, setEndPage] = useState(current.endPage ?? 20);
+
+  const apply = () => {
+    if (mode === "juz") onApply({ mode, juzNumber });
+    else if (mode === "surah")
+      onApply({
+        mode,
+        startSurah,
+        endSurah: Math.max(startSurah, endSurah),
+      });
+    else
+      onApply({
+        mode,
+        startPage,
+        endPage: Math.max(startPage, endPage),
+      });
+    onClose();
+  };
+
+  const tabs = [
+    { value: "juz" as const, label: "Juz" },
+    { value: "surah" as const, label: "Surah" },
+    { value: "page" as const, label: "Page" },
+  ];
+
+  return (
+    <div className="bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-4 mb-4 animate-fade-in">
+      <div className="flex gap-1 bg-neutral-50 dark:bg-neutral-800 rounded-xl p-1 mb-4">
+        {tabs.map((tab) => (
+          <button
+            key={tab.value}
+            onClick={() => setMode(tab.value)}
+            className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all duration-200 ${
+              mode === tab.value
+                ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm"
+                : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {mode === "juz" && (
+        <div className="grid grid-cols-6 gap-1">
+          {juzData.map((j) => (
+            <button
+              key={j.number}
+              onClick={() => setJuzNumber(j.number)}
+              className={`py-2 rounded-lg text-xs font-medium transition-all duration-150 ${
+                juzNumber === j.number
+                  ? "bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900"
+                  : "bg-neutral-50 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+              }`}
+            >
+              {j.number}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {mode === "surah" && (
+        <div className="space-y-2">
+          <div>
+            <label className="block text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-1">
+              From
+            </label>
+            <select
+              value={startSurah}
+              onChange={(e) => setStartSurah(Number(e.target.value))}
+              className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10"
+            >
+              {surahs.map((s) => (
+                <option key={s.number} value={s.number}>
+                  {s.number}. {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-1">
+              To
+            </label>
+            <select
+              value={endSurah}
+              onChange={(e) => setEndSurah(Number(e.target.value))}
+              className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10"
+            >
+              {surahs
+                .filter((s) => s.number >= startSurah)
+                .map((s) => (
+                  <option key={s.number} value={s.number}>
+                    {s.number}. {s.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+        </div>
+      )}
+
+      {mode === "page" && (
+        <div className="space-y-2">
+          <div>
+            <label className="block text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-1">
+              From Page
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={604}
+              value={startPage}
+              onChange={(e) =>
+                setStartPage(Math.max(1, Math.min(604, Number(e.target.value))))
+              }
+              className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-1">
+              To Page
+            </label>
+            <input
+              type="number"
+              min={startPage}
+              max={604}
+              value={endPage}
+              onChange={(e) =>
+                setEndPage(
+                  Math.max(startPage, Math.min(604, Number(e.target.value)))
+                )
+              }
+              className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10"
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-2 mt-4">
+        <button
+          onClick={onClose}
+          className="flex-1 py-2 text-sm font-medium text-neutral-600 dark:text-neutral-300 bg-neutral-50 dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={apply}
+          className="flex-1 py-2 text-sm font-medium bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 rounded-lg transition-colors"
+        >
+          Apply
+        </button>
+      </div>
+    </div>
+  );
 }
 
 const FONT_SIZES: Record<
@@ -41,6 +212,7 @@ interface RevealedAyah {
 export default function QuizScreen({
   range,
   onBack,
+  onRangeChange,
   theme,
   setTheme,
   fontSize,
@@ -68,6 +240,7 @@ export default function QuizScreen({
 
   const sizes = FONT_SIZES[fontSize];
   const [showSettings, setShowSettings] = useState(false);
+  const [showRangePicker, setShowRangePicker] = useState(false);
   const [promptOnly, setPromptOnly] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
@@ -335,11 +508,38 @@ export default function QuizScreen({
             Back
           </button>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400 bg-neutral-50 dark:bg-neutral-900 px-3 py-1.5 rounded-full border border-neutral-200 dark:border-neutral-800">
-              {getRangeLabel()}
-            </span>
             <button
-              onClick={() => setShowSettings(!showSettings)}
+              onClick={() => {
+                setShowRangePicker((v) => !v);
+                if (!showRangePicker) setShowSettings(false);
+              }}
+              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition-all duration-200 ${
+                showRangePicker
+                  ? "bg-neutral-900 dark:bg-neutral-100 border-neutral-900 dark:border-neutral-100 text-white dark:text-neutral-900"
+                  : "text-neutral-500 dark:text-neutral-400 bg-neutral-50 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-100 hover:border-neutral-300"
+              }`}
+              aria-label="Change range"
+            >
+              {getRangeLabel()}
+              <svg
+                className={`w-3 h-3 transition-transform ${showRangePicker ? "rotate-180" : ""}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </button>
+            <button
+              onClick={() => {
+                setShowSettings((v) => !v);
+                if (!showSettings) setShowRangePicker(false);
+              }}
               className={`p-2 rounded-full border transition-all duration-200 ${
                 showSettings
                   ? "bg-neutral-900 dark:bg-neutral-100 border-neutral-900 dark:border-neutral-100 text-white dark:text-neutral-900"
@@ -369,6 +569,14 @@ export default function QuizScreen({
             </button>
           </div>
         </div>
+
+        {showRangePicker && (
+          <RangePopover
+            current={range}
+            onApply={onRangeChange}
+            onClose={() => setShowRangePicker(false)}
+          />
+        )}
 
         {showSettings && (
           <div className="bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-5 mb-4 space-y-4 animate-fade-in">
