@@ -65,7 +65,12 @@ export default function QuizScreen({ range, onBack }: Props) {
       };
     }
 
-    const pool = getAyahsInRange(r.startSurah, r.startAyah, r.endSurah, r.endAyah);
+    const pool = getAyahsInRange(
+      r.startSurah,
+      r.startAyah,
+      r.endSurah,
+      r.endAyah
+    ).filter((a) => a.ayah < surahs[a.surah - 1].ayahCount);
     setAyahPool(pool);
   }, [range]);
 

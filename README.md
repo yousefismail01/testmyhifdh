@@ -1,73 +1,53 @@
-# React + TypeScript + Vite
+# testmyhifdh
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A clean, focused tool for testing Quran memorization. Pick a range — a juz, a span of surahs, or a page range — and the app rolls a random ayah from it. Recite what comes next from memory, then reveal the next ayah (or the next ten) to check yourself.
 
-Currently, two official plugins are available:
+Live at **[testmyhifdh.com](https://testmyhifdh.com)**.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Features
 
-## React Compiler
+- **Three ways to scope the test**: by juz, by surah range, or by page range.
+- **Surah-uniform weighting**: every surah in your range is rolled with equal probability, so short surahs don't get drowned out by long ones. Within a surah, ayahs are uniform.
+- **Final ayahs are never the prompt**: the last ayah of any surah is excluded from the random roll (you can still reveal it). This keeps the test honest — if you got rolled the ending, there'd be nothing to recite.
+- **Vertical wheel reveal**: revealed ayahs flow through a fixed-height reel with a soft mask at the top and bottom. Cards curve away at the edges like an iOS picker. The page itself never scrolls.
+- **Calligraphic Bismillah header**: when a reveal crosses into a new surah, the Bismillah is shown once as a ligature (﷽) above the next ayah card — never duplicated inline.
+- **Uthmani script** via the Amiri Quran font, fetched from the alquran.cloud API.
+- **Settings**:
+  - *Hide surah names* — for a stricter test where you have to identify the location too.
+  - *Test first ayahs* — when the random pick lands on ayah 1, show only the surah name and recall the opening from there.
+- **Last-ayah indicator** on revealed cards, so you know when you've reached the end of a surah while checking.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Stack
 
-## Expanding the ESLint configuration
+- [Vite](https://vitejs.dev/) + React 19 + TypeScript
+- [Tailwind CSS v4](https://tailwindcss.com/)
+- [alquran.cloud API](https://alquran.cloud/api) for Uthmani-script ayah text
+- Deployed on [Vercel](https://vercel.com/) with HTTPS, HSTS, and a locked-down CSP
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Local development
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+git clone https://github.com/yousefismail01/testmyhifdh.git
+cd testmyhifdh
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Open <http://localhost:5173>.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Scripts
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- `npm run dev` — start the Vite dev server
+- `npm run build` — type-check and build for production into `dist/`
+- `npm run preview` — preview the production build locally
+- `npm run lint` — run ESLint
+
+## Deployment
+
+The app is a fully static SPA — any static host works. The production deploy is on Vercel with framework preset **Vite** (auto-detected), output `dist`, no environment variables required.
+
+Security headers (HSTS, CSP, X-Frame-Options, etc.) are set in [`vercel.json`](./vercel.json).
+
+## License
+
+MIT
