@@ -102,23 +102,18 @@ body {
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent 0,
-    black 24px,
+    black 80px,
     black calc(100% - 24px),
     transparent 100%
   );
   mask-image: linear-gradient(
     to bottom,
     transparent 0,
-    black 24px,
+    black 80px,
     black calc(100% - 24px),
     transparent 100%
   );
   overscroll-behavior-y: contain;
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
-}
-
-.wheel-card {
-  transform-origin: center top;
-  will-change: transform, opacity;
 }

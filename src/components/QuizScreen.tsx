@@ -375,79 +375,10 @@ export default function QuizScreen({
     }
   }, [ayahPool, rollNewAyah]);
 
-  const rafIdRef = useRef<number | null>(null);
-  // Stacking with a fixed visible cap. Cards inside the viewport render in
-  // their natural flow. Once a card scrolls past the top, it joins a small
-  // 3-slot stack pinned at the top of the reel. Older cards beyond the
-  // visible stack depth fade out entirely.
-  const updateWheel = useCallback(() => {
-    if (rafIdRef.current !== null) return;
-    rafIdRef.current = requestAnimationFrame(() => {
-      rafIdRef.current = null;
-      const sc = scrollerRef.current;
-      if (!sc) return;
-      const cards = sc.querySelectorAll<HTMLElement>("[data-wheel-card]");
-      if (cards.length === 0) return;
-      const scRect = sc.getBoundingClientRect();
-
-      // Reset transforms before measuring natural positions.
-      cards.forEach((card) => {
-        card.style.transform = "";
-        card.style.opacity = "1";
-        card.style.zIndex = "";
-      });
-      void sc.offsetHeight;
-
-      const tops: number[] = [];
-      const heights: number[] = [];
-      cards.forEach((card) => {
-        const r = card.getBoundingClientRect();
-        tops.push(r.top - scRect.top);
-        heights.push(r.height);
-      });
-
-      const STACK_DEPTH = 3; // max cards visible in the stack
-      const PEEK = 22; // visible peek per stacked card
-      const stackTotal = STACK_DEPTH * PEEK;
-
-      // First card with bottom past the stack band is the first one in
-      // normal flow. Cards before it pile up in the stack.
-      let firstInViewIdx = 0;
-      for (let i = 0; i < tops.length; i++) {
-        if (tops[i] + heights[i] > stackTotal) {
-          firstInViewIdx = i;
-          break;
-        }
-        firstInViewIdx = i;
-      }
-
-      cards.forEach((card, i) => {
-        let ty = 0;
-        let scale = 1;
-        let opacity = 1;
-        let zIndex = 1000;
-
-        if (i < firstInViewIdx) {
-          const stackOffset = firstInViewIdx - i; // 1 = freshest stuck
-          if (stackOffset > STACK_DEPTH) {
-            opacity = 0;
-          } else {
-            // slot 0 = oldest visible (top of stack, deepest)
-            // slot STACK_DEPTH-1 = freshest (bottom of stack, closest to in-view)
-            const slot = STACK_DEPTH - stackOffset;
-            const targetTop = slot * PEEK;
-            ty = targetTop - tops[i];
-            scale = 1 - (STACK_DEPTH - 1 - slot) * 0.035;
-            zIndex = 800 + slot;
-          }
-        }
-
-        card.style.transform = `translateY(${ty}px) scale(${scale})`;
-        card.style.opacity = String(opacity);
-        card.style.zIndex = String(zIndex);
-      });
-    });
-  }, []);
+  // The mask gradient on .reveal-mask handles the top/bottom fade; no
+  // per-card transforms are needed. Keep an empty handler so the onScroll
+  // and resize listeners stay wired without effect.
+  const updateWheel = useCallback(() => {}, []);
 
   useEffect(() => {
     if (!scrollerRef.current) return;
