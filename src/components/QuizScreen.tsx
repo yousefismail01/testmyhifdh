@@ -391,34 +391,64 @@ export default function QuizScreen({
       cards.forEach((card) => {
         card.style.transform = "";
         card.style.opacity = "1";
+        card.style.zIndex = "";
       });
       void sc.offsetHeight;
 
-      // Compute each card's center relative to the scroller viewport.
-      const centers: number[] = [];
+      // Read each card's natural top + height relative to the scroller.
+      const tops: number[] = [];
+      const heights: number[] = [];
       cards.forEach((card) => {
         const r = card.getBoundingClientRect();
-        centers.push(r.top - scRect.top + r.height / 2);
+        tops.push(r.top - scRect.top);
+        heights.push(r.height);
       });
 
-      // Soft stacking: cards inside the viewport stay flat. Cards heading
-      // out of either edge progressively shrink and fade, so they feel
-      // like they're stacking behind the visible ones.
-      const viewportCenter = scH / 2;
+      // Find the focused card: the topmost card whose top is at or just
+      // below the scroller's top edge. (As the user scrolls down, focus
+      // advances to the next card.)
+      let focusIdx = 0;
+      for (let i = 0; i < tops.length; i++) {
+        if (tops[i] >= -8) {
+          focusIdx = i;
+          break;
+        }
+        focusIdx = i;
+      }
+
+      const PEEK = 16; // visible peek of each stacked card
+      const STACK_DEPTH = 5;
+      const focusBottom = tops[focusIdx] + heights[focusIdx];
+      let cumulative = focusBottom;
+
       cards.forEach((card, i) => {
-        const cardCenter = centers[i];
-        // Normalized distance from viewport center (0 = center, 0.5 = edge).
-        const dist = Math.abs(cardCenter - viewportCenter) / scH;
+        const offset = i - focusIdx;
+        let ty = 0;
         let scale = 1;
         let opacity = 1;
-        if (dist > 0.35) {
-          const t = Math.min(1.2, (dist - 0.35) / 0.5);
-          scale = 1 - t * 0.18;
-          opacity = Math.max(0, 1 - t * 1.1);
+        let zIndex = 1000 - Math.abs(offset);
+
+        if (offset > 0) {
+          // Below focus — tuck behind, leaving a PEEK visible.
+          const cardH = heights[i];
+          const targetTop = cumulative + PEEK - cardH;
+          ty = targetTop - tops[i];
+          cumulative += PEEK;
+          scale = 1 - Math.min(offset, STACK_DEPTH) * 0.02;
+          opacity = offset <= STACK_DEPTH + 2 ? 1 : 0;
+          zIndex = 900 - offset; // behind the focus card
+        } else if (offset < 0) {
+          // Above focus — fade past.
+          const distAbove = Math.abs(offset);
+          opacity = distAbove <= 2 ? 1 - distAbove * 0.4 : 0;
+          scale = 1 - Math.min(distAbove, 3) * 0.03;
+          zIndex = 800 - distAbove;
         }
+
         card.style.transformOrigin = "center";
-        card.style.transform = `scale(${scale})`;
+        card.style.transform = `translateY(${ty}px) scale(${scale})`;
         card.style.opacity = String(opacity);
+        card.style.zIndex = String(zIndex);
       });
     });
   }, []);
@@ -733,7 +763,7 @@ export default function QuizScreen({
                             </div>
                           ) : (
                             <p
-                              className={`font-quran ${sizes.current} leading-[2.4] text-neutral-900 dark:text-neutral-100 text-right`}
+                              className={`font-quran ${sizes.current} leading-[2.4] text-neutral-800 dark:text-neutral-200 text-right`}
                               dir="rtl"
                             >
                               {ayahText}
@@ -754,7 +784,7 @@ export default function QuizScreen({
                     <div
                       key={i}
                       data-wheel-card
-                      className="wheel-card animate-slide-up"
+                      className="wheel-card animate-fade-in-soft"
                     >
                       {hasBismillahHeader && (
                         <div className="text-center mb-3">
@@ -786,7 +816,7 @@ export default function QuizScreen({
                           </div>
                         )}
                         <p
-                          className={`font-quran ${sizes.revealed} leading-[2.2] text-neutral-700 dark:text-neutral-200 text-right`}
+                          className={`font-quran ${sizes.revealed} leading-[2.2] text-neutral-800 dark:text-neutral-200 text-right`}
                           dir="rtl"
                         >
                           {ra.text}
