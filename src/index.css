@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @font-face {
   font-family: 'qpc-hafs';
   src: url('/fonts/UthmanicHafs1Ver18.woff2') format('woff2');
@@ -18,6 +20,11 @@ body {
   background: #ffffff;
   overscroll-behavior: none;
   height: 100%;
+}
+
+html.dark,
+html.dark body {
+  background: #0a0a0a;
 }
 
 body {

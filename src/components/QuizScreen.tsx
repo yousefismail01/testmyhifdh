@@ -9,11 +9,27 @@ import {
 } from "../data/quran-meta";
 import { fetchAyahText } from "../data/quran-api";
 import type { SelectedRange } from "./RangeSelector";
+import { usePersistedState } from "../hooks/usePersistedState";
+import type { Theme, FontSize } from "../App";
 
 interface Props {
   range: SelectedRange;
   onBack: () => void;
+  theme: Theme;
+  setTheme: (t: Theme) => void;
+  fontSize: FontSize;
+  setFontSize: (s: FontSize) => void;
 }
+
+const FONT_SIZES: Record<
+  FontSize,
+  { current: string; revealed: string; bismillah: string }
+> = {
+  sm: { current: "text-2xl", revealed: "text-xl", bismillah: "text-2xl" },
+  md: { current: "text-3xl", revealed: "text-2xl", bismillah: "text-3xl" },
+  lg: { current: "text-4xl", revealed: "text-3xl", bismillah: "text-4xl" },
+  xl: { current: "text-5xl", revealed: "text-4xl", bismillah: "text-5xl" },
+};
 
 interface RevealedAyah {
   surah: number;
@@ -22,7 +38,14 @@ interface RevealedAyah {
   isEndOfSurah: boolean;
 }
 
-export default function QuizScreen({ range, onBack }: Props) {
+export default function QuizScreen({
+  range,
+  onBack,
+  theme,
+  setTheme,
+  fontSize,
+  setFontSize,
+}: Props) {
   const [ayahPool, setAyahPool] = useState<AyahReference[]>([]);
   const [currentAyah, setCurrentAyah] = useState<AyahReference | null>(null);
   const [ayahText, setAyahText] = useState("");
@@ -30,9 +53,20 @@ export default function QuizScreen({ range, onBack }: Props) {
   const [loading, setLoading] = useState(true);
   const lastRevealedRef = useRef<AyahReference | null>(null);
 
-  const [hideSurahName, setHideSurahName] = useState(false);
-  const [testFirstAyahs, setTestFirstAyahs] = useState(false);
-  const [showAyahNumbers, setShowAyahNumbers] = useState(true);
+  const [hideSurahName, setHideSurahName] = usePersistedState(
+    "tmh.hideSurahName",
+    false
+  );
+  const [testFirstAyahs, setTestFirstAyahs] = usePersistedState(
+    "tmh.testFirstAyahs",
+    false
+  );
+  const [showAyahNumbers, setShowAyahNumbers] = usePersistedState(
+    "tmh.showAyahNumbers",
+    true
+  );
+
+  const sizes = FONT_SIZES[fontSize];
   const [showSettings, setShowSettings] = useState(false);
   const [promptOnly, setPromptOnly] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
@@ -265,7 +299,7 @@ export default function QuizScreen({ range, onBack }: Props) {
     // that combine the Arabic-Indic digits into the Mushaf rosette ornament.
     // No U+06DD prefix — that draws as a separate empty circle in this font.
     return (
-      <span className="font-quran text-neutral-500 mx-1">
+      <span className="font-quran text-neutral-500 dark:text-neutral-400 mx-1">
         {toArabicIndic(ayahNum)}
       </span>
     );
@@ -278,12 +312,12 @@ export default function QuizScreen({ range, onBack }: Props) {
       : false;
 
   return (
-    <div className="h-screen bg-white animate-fade-in flex flex-col overflow-hidden">
+    <div className="h-screen bg-white dark:bg-neutral-950 animate-fade-in flex flex-col overflow-hidden">
       <div className="max-w-2xl mx-auto w-full px-4 pt-4 pb-4 flex flex-col flex-1 min-h-0">
         <div className="flex items-center justify-between pb-4 shrink-0">
           <button
             onClick={onBack}
-            className="flex items-center gap-2 text-neutral-500 hover:text-neutral-900 transition-colors"
+            className="flex items-center gap-2 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
           >
             <svg
               className="w-5 h-5"
@@ -301,15 +335,15 @@ export default function QuizScreen({ range, onBack }: Props) {
             Back
           </button>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-neutral-500 bg-neutral-50 px-3 py-1.5 rounded-full border border-neutral-200">
+            <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400 bg-neutral-50 dark:bg-neutral-900 px-3 py-1.5 rounded-full border border-neutral-200 dark:border-neutral-800">
               {getRangeLabel()}
             </span>
             <button
               onClick={() => setShowSettings(!showSettings)}
               className={`p-2 rounded-full border transition-all duration-200 ${
                 showSettings
-                  ? "bg-neutral-900 border-neutral-900 text-white"
-                  : "bg-white border-neutral-200 text-neutral-500 hover:text-neutral-900 hover:border-neutral-300"
+                  ? "bg-neutral-900 dark:bg-neutral-100 border-neutral-900 dark:border-neutral-100 text-white dark:text-neutral-900"
+                  : "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:border-neutral-300"
               }`}
               aria-label="Settings"
             >
@@ -337,13 +371,13 @@ export default function QuizScreen({ range, onBack }: Props) {
         </div>
 
         {showSettings && (
-          <div className="bg-white rounded-3xl border border-neutral-200 p-5 mb-4 space-y-4 animate-fade-in">
+          <div className="bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-5 mb-4 space-y-4 animate-fade-in">
             <label className="flex items-center justify-between cursor-pointer">
               <div className="pr-4">
-                <div className="text-sm font-medium text-neutral-800">
+                <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
                   Hide surah names
                 </div>
-                <div className="text-xs text-neutral-400 mt-0.5">
+                <div className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
                   Don't show which surah the ayah is from
                 </div>
               </div>
@@ -351,15 +385,15 @@ export default function QuizScreen({ range, onBack }: Props) {
                 type="checkbox"
                 checked={hideSurahName}
                 onChange={(e) => setHideSurahName(e.target.checked)}
-                className="w-5 h-5 accent-neutral-900 shrink-0"
+                className="w-5 h-5 accent-neutral-900 dark:accent-neutral-100 shrink-0"
               />
             </label>
             <label className="flex items-center justify-between cursor-pointer">
               <div className="pr-4">
-                <div className="text-sm font-medium text-neutral-800">
+                <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
                   Test first ayahs
                 </div>
-                <div className="text-xs text-neutral-400 mt-0.5">
+                <div className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
                   When the rolled ayah is the first of a surah, show only the
                   surah name and you guess the ayah
                 </div>
@@ -368,15 +402,15 @@ export default function QuizScreen({ range, onBack }: Props) {
                 type="checkbox"
                 checked={testFirstAyahs}
                 onChange={(e) => setTestFirstAyahs(e.target.checked)}
-                className="w-5 h-5 accent-neutral-900 shrink-0"
+                className="w-5 h-5 accent-neutral-900 dark:accent-neutral-100 shrink-0"
               />
             </label>
             <label className="flex items-center justify-between cursor-pointer">
               <div className="pr-4">
-                <div className="text-sm font-medium text-neutral-800">
+                <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
                   Show ayah numbers
                 </div>
-                <div className="text-xs text-neutral-400 mt-0.5">
+                <div className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
                   Display an end-of-ayah marker with the ayah number
                 </div>
               </div>
@@ -384,15 +418,57 @@ export default function QuizScreen({ range, onBack }: Props) {
                 type="checkbox"
                 checked={showAyahNumbers}
                 onChange={(e) => setShowAyahNumbers(e.target.checked)}
-                className="w-5 h-5 accent-neutral-900 shrink-0"
+                className="w-5 h-5 accent-neutral-900 dark:accent-neutral-100 shrink-0"
               />
             </label>
+
+            <div className="pt-1">
+              <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200 mb-2">
+                Text size
+              </div>
+              <div className="flex gap-1 bg-neutral-50 dark:bg-neutral-800 rounded-xl p-1">
+                {(["sm", "md", "lg", "xl"] as const).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setFontSize(s)}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
+                      fontSize === s
+                        ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm"
+                        : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+                    }`}
+                  >
+                    {s.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-1">
+              <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200 mb-2">
+                Theme
+              </div>
+              <div className="flex gap-1 bg-neutral-50 dark:bg-neutral-800 rounded-xl p-1">
+                {(["light", "dark"] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setTheme(t)}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 capitalize ${
+                      theme === t
+                        ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm"
+                        : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
         {loading ? (
           <div className="flex items-center justify-center flex-1 animate-fade-in-soft">
-            <div className="w-7 h-7 border-2 border-neutral-300 border-t-neutral-900 rounded-full animate-spin" />
+            <div className="w-7 h-7 border-2 border-neutral-300 dark:border-neutral-700 border-t-neutral-900 rounded-full animate-spin" />
           </div>
         ) : (
           <div
@@ -418,22 +494,22 @@ export default function QuizScreen({ range, onBack }: Props) {
                         {hasBismillahHeader && (
                           <div className="text-center mb-3 animate-fade-in-soft">
                             <span
-                              className="bismillah-glyph text-3xl text-neutral-700"
+                              className={`bismillah-glyph ${sizes.bismillah} text-neutral-700 dark:text-neutral-200`}
                               dir="rtl"
                             >
                               {BISMILLAH_DISPLAY}
                             </span>
                           </div>
                         )}
-                        <div className="bg-white rounded-3xl border-2 border-neutral-900/10 p-7 ring-1 ring-neutral-900/5">
+                        <div className="bg-white dark:bg-neutral-900 rounded-3xl border-2 border-neutral-900/10 dark:border-neutral-100/15 p-7 ring-1 ring-neutral-900/5 dark:ring-neutral-100/10">
                           {!hideSurahName && !promptOnly && (
                             <div className="text-center mb-4 flex items-center justify-center gap-2">
-                              <span className="text-xs font-medium text-neutral-700 bg-neutral-100 px-3 py-1 rounded-full">
+                              <span className="text-xs font-medium text-neutral-700 dark:text-neutral-200 bg-neutral-100 dark:bg-neutral-800 px-3 py-1 rounded-full">
                                 {currentSurahInfo!.nameArabic} —{" "}
                                 {currentSurahInfo!.name} : {currentAyah.ayah}
                               </span>
                               {isLastAyah && (
-                                <span className="text-xs font-medium text-rose-700 bg-rose-50 px-3 py-1 rounded-full border border-rose-100">
+                                <span className="text-xs font-medium text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 px-3 py-1 rounded-full border border-rose-100 dark:border-rose-900/60">
                                   Last ayah
                                 </span>
                               )}
@@ -442,19 +518,19 @@ export default function QuizScreen({ range, onBack }: Props) {
 
                           {promptOnly ? (
                             <div className="text-center py-6">
-                              <div className="text-xs uppercase tracking-widest text-neutral-400 mb-3">
+                              <div className="text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-3">
                                 What's the first ayah of
                               </div>
-                              <div className="font-quran text-5xl text-neutral-900 mb-1">
+                              <div className="font-quran text-5xl text-neutral-900 dark:text-neutral-100 mb-1">
                                 {currentSurahInfo!.nameArabic}
                               </div>
-                              <div className="text-neutral-500 text-sm">
+                              <div className="text-neutral-500 dark:text-neutral-400 text-sm">
                                 {currentSurahInfo!.name}
                               </div>
                             </div>
                           ) : (
                             <p
-                              className="font-quran text-3xl leading-[2.4] text-neutral-900 text-right"
+                              className={`font-quran ${sizes.current} leading-[2.4] text-neutral-900 dark:text-neutral-100 text-right`}
                               dir="rtl"
                             >
                               {ayahText}
@@ -480,34 +556,34 @@ export default function QuizScreen({ range, onBack }: Props) {
                       {hasBismillahHeader && (
                         <div className="text-center mb-3">
                           {!hideSurahName && (
-                            <div className="text-xs uppercase tracking-widest text-neutral-400 mb-1.5">
+                            <div className="text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-1.5">
                               {surahs[ra.surah - 1].nameArabic} —{" "}
                               {surahs[ra.surah - 1].name}
                             </div>
                           )}
                           <span
-                            className="bismillah-glyph text-2xl text-neutral-700"
+                            className={`bismillah-glyph ${sizes.revealed} text-neutral-700 dark:text-neutral-200`}
                             dir="rtl"
                           >
                             {BISMILLAH_DISPLAY}
                           </span>
                         </div>
                       )}
-                      <div className="bg-white rounded-3xl border border-neutral-200 p-6">
+                      <div className="bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-6">
                         {!hideSurahName && (
                           <div className="text-center mb-3 flex items-center justify-center gap-2">
-                            <span className="text-xs text-neutral-400">
+                            <span className="text-xs text-neutral-400 dark:text-neutral-500">
                               {surahs[ra.surah - 1].nameArabic} : {ra.ayah}
                             </span>
                             {ra.isEndOfSurah && (
-                              <span className="text-[10px] font-medium text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100">
+                              <span className="text-[10px] font-medium text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded-full border border-rose-100 dark:border-rose-900/60">
                                 Last ayah
                               </span>
                             )}
                           </div>
                         )}
                         <p
-                          className="font-quran text-2xl leading-[2.2] text-neutral-700 text-right"
+                          className={`font-quran ${sizes.revealed} leading-[2.2] text-neutral-700 dark:text-neutral-200 text-right`}
                           dir="rtl"
                         >
                           {ra.text}
@@ -524,13 +600,13 @@ export default function QuizScreen({ range, onBack }: Props) {
             <div className="flex gap-3 mb-3">
               <button
                 onClick={revealNext}
-                className="flex-1 py-3 bg-white hover:bg-neutral-50 text-neutral-700 font-medium rounded-xl border border-neutral-200 transition-all duration-200 active:scale-[0.99]"
+                className="flex-1 py-3 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 font-medium rounded-xl border border-neutral-200 dark:border-neutral-800 transition-all duration-200 active:scale-[0.99]"
               >
                 {promptOnly ? "Reveal First Ayah" : "Reveal Next Ayah"}
               </button>
               <button
                 onClick={revealRemainingPage}
-                className="flex-1 py-3 bg-white hover:bg-neutral-50 text-neutral-700 font-medium rounded-xl border border-neutral-200 transition-all duration-200 active:scale-[0.99]"
+                className="flex-1 py-3 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 font-medium rounded-xl border border-neutral-200 dark:border-neutral-800 transition-all duration-200 active:scale-[0.99]"
               >
                 Reveal More (+10)
               </button>
@@ -538,7 +614,7 @@ export default function QuizScreen({ range, onBack }: Props) {
 
             <button
               onClick={rollNewAyah}
-              className="w-full py-3.5 bg-neutral-900 hover:bg-neutral-800 text-white font-medium rounded-xl transition-all duration-200 active:scale-[0.99]"
+              className="w-full py-3.5 bg-neutral-900 dark:bg-neutral-100 hover:bg-neutral-800 dark:hover:bg-neutral-200 text-white dark:text-neutral-900 font-medium rounded-xl transition-all duration-200 active:scale-[0.99]"
             >
               Next Random Ayah
             </button>

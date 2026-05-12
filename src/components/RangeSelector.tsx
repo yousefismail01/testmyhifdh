@@ -49,30 +49,30 @@ export default function RangeSelector({ onStart }: Props) {
   ];
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center p-4 animate-fade-in">
+    <div className="min-h-screen bg-white dark:bg-neutral-950 flex items-center justify-center p-4 animate-fade-in">
       <div className="w-full max-w-lg">
         <div className="text-center mb-12 animate-slide-up">
-          <h1 className="text-4xl font-medium text-neutral-900 tracking-tight">
+          <h1 className="text-4xl font-medium text-neutral-900 dark:text-neutral-100 tracking-tight">
             testmyhifdh
           </h1>
-          <p className="text-neutral-400 text-sm mt-2 tracking-wide">
+          <p className="text-neutral-400 dark:text-neutral-500 text-sm mt-2 tracking-wide">
             test your memorization, ayah by ayah
           </p>
         </div>
 
         <div
-          className="bg-white rounded-3xl border border-neutral-200 p-6 animate-slide-up"
+          className="bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-6 animate-slide-up"
           style={{ animationDelay: "60ms" }}
         >
-          <div className="flex gap-1 bg-neutral-50 rounded-2xl p-1 mb-6">
+          <div className="flex gap-1 bg-neutral-50 dark:bg-neutral-900 rounded-2xl p-1 mb-6">
             {tabs.map((tab) => (
               <button
                 key={tab.value}
                 onClick={() => setMode(tab.value)}
                 className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-medium transition-all duration-200 ${
                   mode === tab.value
-                    ? "bg-white text-neutral-900 shadow-sm"
-                    : "text-neutral-500 hover:text-neutral-700"
+                    ? "bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-sm"
+                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300"
                 }`}
               >
                 {tab.label}
@@ -83,7 +83,7 @@ export default function RangeSelector({ onStart }: Props) {
           <div key={mode} className="animate-fade-in-soft">
             {mode === "juz" && (
               <div>
-                <label className="block text-xs uppercase tracking-widest text-neutral-400 mb-3">
+                <label className="block text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-3">
                   Select Juz
                 </label>
                 <div className="grid grid-cols-6 gap-1.5">
@@ -93,8 +93,8 @@ export default function RangeSelector({ onStart }: Props) {
                       onClick={() => setJuzNumber(j.number)}
                       className={`py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
                         juzNumber === j.number
-                          ? "bg-neutral-900 text-white"
-                          : "bg-neutral-50 text-neutral-600 hover:bg-neutral-100"
+                          ? "bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900"
+                          : "bg-neutral-50 dark:bg-neutral-900 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800"
                       }`}
                     >
                       {j.number}
@@ -107,13 +107,13 @@ export default function RangeSelector({ onStart }: Props) {
             {mode === "surah" && (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs uppercase tracking-widest text-neutral-400 mb-2">
+                  <label className="block text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-2">
                     From
                   </label>
                   <select
                     value={startSurah}
                     onChange={(e) => setStartSurah(Number(e.target.value))}
-                    className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl text-neutral-800 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-300 transition-all"
+                    className="w-full px-4 py-3 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-300 transition-all"
                   >
                     {surahs.map((s) => (
                       <option key={s.number} value={s.number}>
@@ -123,13 +123,13 @@ export default function RangeSelector({ onStart }: Props) {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs uppercase tracking-widest text-neutral-400 mb-2">
+                  <label className="block text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-2">
                     To
                   </label>
                   <select
                     value={endSurah}
                     onChange={(e) => setEndSurah(Number(e.target.value))}
-                    className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl text-neutral-800 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-300 transition-all"
+                    className="w-full px-4 py-3 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-300 transition-all"
                   >
                     {surahs
                       .filter((s) => s.number >= startSurah)
@@ -146,7 +146,7 @@ export default function RangeSelector({ onStart }: Props) {
             {mode === "page" && (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs uppercase tracking-widest text-neutral-400 mb-2">
+                  <label className="block text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-2">
                     From Page
                   </label>
                   <input
@@ -159,11 +159,11 @@ export default function RangeSelector({ onStart }: Props) {
                         Math.max(1, Math.min(604, Number(e.target.value)))
                       )
                     }
-                    className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl text-neutral-800 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-300 transition-all"
+                    className="w-full px-4 py-3 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-300 transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs uppercase tracking-widest text-neutral-400 mb-2">
+                  <label className="block text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-2">
                     To Page
                   </label>
                   <input
@@ -176,7 +176,7 @@ export default function RangeSelector({ onStart }: Props) {
                         Math.max(startPage, Math.min(604, Number(e.target.value)))
                       )
                     }
-                    className="w-full px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl text-neutral-800 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-300 transition-all"
+                    className="w-full px-4 py-3 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-300 transition-all"
                   />
                 </div>
               </div>
@@ -185,14 +185,14 @@ export default function RangeSelector({ onStart }: Props) {
 
           <button
             onClick={handleStart}
-            className="w-full mt-6 py-3.5 bg-neutral-900 hover:bg-neutral-800 text-white font-medium rounded-xl transition-all duration-200 active:scale-[0.99]"
+            className="w-full mt-6 py-3.5 bg-neutral-900 dark:bg-neutral-100 hover:bg-neutral-800 dark:hover:bg-neutral-200 text-white dark:text-neutral-900 font-medium rounded-xl transition-all duration-200 active:scale-[0.99]"
           >
             Begin
           </button>
         </div>
 
         <p
-          className="text-center text-neutral-300 text-xs mt-8 animate-fade-in-soft"
+          className="text-center text-neutral-300 dark:text-neutral-600 text-xs mt-8 animate-fade-in-soft"
           style={{ animationDelay: "200ms" }}
         >
           Surahs are weighted equally — short surahs roll as often as long ones
