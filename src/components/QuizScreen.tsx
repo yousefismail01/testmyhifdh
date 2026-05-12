@@ -376,45 +376,75 @@ export default function QuizScreen({
   }, [ayahPool, rollNewAyah]);
 
   const rafIdRef = useRef<number | null>(null);
-  // Adapted CodyHouse stacking-cards effect:
-  //   - cards use position: sticky; top: stickyTop;
-  //   - each card has translateY(gap * i) so they stagger and peek when stuck;
-  //   - past their sticky stop, cards scale down (last card stays full size).
-  // Uses each card's own offsetTop so variable-height ayah cards work too.
+  // Stacking with a fixed visible cap. Cards inside the viewport render in
+  // their natural flow. Once a card scrolls past the top, it joins a small
+  // 3-slot stack pinned at the top of the reel. Older cards beyond the
+  // visible stack depth fade out entirely.
   const updateWheel = useCallback(() => {
     if (rafIdRef.current !== null) return;
     rafIdRef.current = requestAnimationFrame(() => {
       rafIdRef.current = null;
       const sc = scrollerRef.current;
       if (!sc) return;
-      const wrap = sc.querySelector<HTMLElement>(".stack-cards");
-      if (!wrap) return;
-      const cards = wrap.querySelectorAll<HTMLElement>("[data-wheel-card]");
+      const cards = sc.querySelectorAll<HTMLElement>("[data-wheel-card]");
       if (cards.length === 0) return;
+      const scRect = sc.getBoundingClientRect();
 
-      const wrapStyle = getComputedStyle(wrap);
-      const gap = parseFloat(wrapStyle.getPropertyValue("--stack-cards-gap")) || 14;
-      const stickyTop =
-        parseFloat(wrapStyle.getPropertyValue("--stack-cards-sticky-top")) ||
-        16;
+      // Reset transforms before measuring natural positions.
+      cards.forEach((card) => {
+        card.style.transform = "";
+        card.style.opacity = "1";
+        card.style.zIndex = "";
+      });
+      void sc.offsetHeight;
 
-      const wrapTop =
-        wrap.getBoundingClientRect().top - sc.getBoundingClientRect().top;
+      const tops: number[] = [];
+      const heights: number[] = [];
+      cards.forEach((card) => {
+        const r = card.getBoundingClientRect();
+        tops.push(r.top - scRect.top);
+        heights.push(r.height);
+      });
+
+      const STACK_DEPTH = 3; // max cards visible in the stack
+      const PEEK = 22; // visible peek per stacked card
+      const stackTotal = STACK_DEPTH * PEEK;
+
+      // First card with bottom past the stack band is the first one in
+      // normal flow. Cards before it pile up in the stack.
+      let firstInViewIdx = 0;
+      for (let i = 0; i < tops.length; i++) {
+        if (tops[i] + heights[i] > stackTotal) {
+          firstInViewIdx = i;
+          break;
+        }
+        firstInViewIdx = i;
+      }
 
       cards.forEach((card, i) => {
-        const cardH = card.offsetHeight;
-        // Where the card's top sits in the scroll viewport, before stickying.
-        // (offsetTop is transform-free; the translateY we apply doesn't shift it.)
-        const naturalTop = wrapTop + card.offsetTop + gap * i;
-        const scrolling = stickyTop - naturalTop;
+        let ty = 0;
         let scale = 1;
-        if (scrolling > 0 && i < cards.length - 1) {
-          scale = (cardH - scrolling * 0.05) / cardH;
-          if (scale < 0.6) scale = 0.6;
+        let opacity = 1;
+        let zIndex = 1000;
+
+        if (i < firstInViewIdx) {
+          const stackOffset = firstInViewIdx - i; // 1 = freshest stuck
+          if (stackOffset > STACK_DEPTH) {
+            opacity = 0;
+          } else {
+            // slot 0 = oldest visible (top of stack, deepest)
+            // slot STACK_DEPTH-1 = freshest (bottom of stack, closest to in-view)
+            const slot = STACK_DEPTH - stackOffset;
+            const targetTop = slot * PEEK;
+            ty = targetTop - tops[i];
+            scale = 1 - (STACK_DEPTH - 1 - slot) * 0.035;
+            zIndex = 800 + slot;
+          }
         }
-        card.style.transform = `translateY(${gap * i}px) scale(${scale})`;
-        card.style.zIndex = String(100 + i);
-        card.style.opacity = "1";
+
+        card.style.transform = `translateY(${ty}px) scale(${scale})`;
+        card.style.opacity = String(opacity);
+        card.style.zIndex = String(zIndex);
       });
     });
   }, []);
@@ -679,12 +709,7 @@ export default function QuizScreen({
               onScroll={updateWheel}
               className="reveal-mask scrollbar-hide flex-1 min-h-0 overflow-y-auto -mx-4 px-4"
             >
-              <div
-                className="stack-cards pt-4"
-                style={{
-                  paddingBottom: `${(revealedAyahs.length + 1) * 14 + 120}px`,
-                }}
-              >
+              <div className="space-y-4 pt-12 pb-16">
                 {currentAyah &&
                   (() => {
                     const hasBismillahHeader =

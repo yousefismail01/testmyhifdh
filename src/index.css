@@ -118,16 +118,7 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
-.stack-cards {
-  --stack-cards-gap: 14px;
-  --stack-cards-sticky-top: 16px;
-}
-
-.stack-cards__item,
 .wheel-card {
-  position: -webkit-sticky;
-  position: sticky;
-  top: var(--stack-cards-sticky-top, 16px);
   transform-origin: center top;
-  will-change: transform;
+  will-change: transform, opacity;
 }
