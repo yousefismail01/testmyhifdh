@@ -261,11 +261,11 @@ export default function QuizScreen({ range, onBack }: Props) {
 
   const renderAyahMarker = (ayahNum: number) => {
     if (!showAyahNumbers) return null;
-    // U+06DD (ARABIC END OF AYAH) + Arabic-Indic digits.
-    // KFGQPC Nastaleeq renders this as the Mushaf rosette with the digits inside.
+    // KFGQPC Nastaleeq has digit-sequence ligatures (e.g. a001_a009_a009)
+    // that combine the Arabic-Indic digits into the Mushaf rosette ornament.
+    // No U+06DD prefix — that draws as a separate empty circle in this font.
     return (
       <span className="font-quran text-neutral-500 mx-1">
-        {"۝"}
         {toArabicIndic(ayahNum)}
       </span>
     );
