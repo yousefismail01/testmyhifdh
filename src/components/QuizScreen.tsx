@@ -408,13 +408,16 @@ export default function QuizScreen({
       const focusY = firstCenter + progress * (lastCenter - firstCenter);
 
       cards.forEach((card, i) => {
-        const dist = (centers[i] - focusY) / (scH / 2);
-        const clamped = Math.max(-1.6, Math.min(1.6, dist));
+        // Tighter focus zone: cards reach full rotation closer to focus,
+        // so every card visible in the viewport noticeably curves rather
+        // than just the topmost extreme.
+        const dist = (centers[i] - focusY) / (scH / 3.5);
+        const clamped = Math.max(-1.4, Math.min(1.4, dist));
         const rotateX = -clamped * 55;
-        const scale = 1 - Math.abs(clamped) * 0.22;
-        const translateZ = -Math.abs(clamped) * 140;
+        const scale = 1 - Math.abs(clamped) * 0.18;
+        const translateZ = -Math.abs(clamped) * 100;
         // Hinge cards at the edge nearest the focus point so adjacent cards
-        // stay visually connected at their shared edges (real wheel feel).
+        // stay visually connected at their shared edges.
         card.style.transformOrigin =
           dist < 0 ? "center bottom" : dist > 0 ? "center top" : "center";
         card.style.transform = `translateZ(${translateZ}px) rotateX(${rotateX}deg) scale(${scale})`;

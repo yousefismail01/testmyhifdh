@@ -64,6 +64,19 @@ export default function App() {
     const root = document.documentElement;
     if (theme === "dark") root.classList.add("dark");
     else root.classList.remove("dark");
+
+    const themeColor = theme === "dark" ? "#0a0a0a" : "#ffffff";
+    const meta = document.querySelector<HTMLMetaElement>(
+      'meta[name="theme-color"]'
+    );
+    if (meta) meta.content = themeColor;
+
+    const iosBar = document.querySelector<HTMLMetaElement>(
+      'meta[name="apple-mobile-web-app-status-bar-style"]'
+    );
+    if (iosBar) {
+      iosBar.content = theme === "dark" ? "black-translucent" : "default";
+    }
   }, [theme]);
 
   useEffect(() => {
