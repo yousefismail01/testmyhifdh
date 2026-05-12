@@ -413,6 +413,10 @@ export default function QuizScreen({
         const rotateX = -clamped * 55;
         const scale = 1 - Math.abs(clamped) * 0.22;
         const translateZ = -Math.abs(clamped) * 140;
+        // Hinge cards at the edge nearest the focus point so adjacent cards
+        // stay visually connected at their shared edges (real wheel feel).
+        card.style.transformOrigin =
+          dist < 0 ? "center bottom" : dist > 0 ? "center top" : "center";
         card.style.transform = `translateZ(${translateZ}px) rotateX(${rotateX}deg) scale(${scale})`;
       });
     });
