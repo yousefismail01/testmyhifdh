@@ -65,3 +65,28 @@ body {
 .animate-slide-up {
   animation: slide-up 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
+
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.reveal-mask {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    black 48px,
+    black calc(100% - 32px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    black 48px,
+    black calc(100% - 32px),
+    transparent 100%
+  );
+}

@@ -34,6 +34,7 @@ export default function QuizScreen({ range, onBack }: Props) {
   const [testFirstAyahs, setTestFirstAyahs] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [promptOnly, setPromptOnly] = useState(false);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let r: {
@@ -94,6 +95,15 @@ export default function QuizScreen({ range, onBack }: Props) {
       rollNewAyah();
     }
   }, [ayahPool, rollNewAyah]);
+
+  useEffect(() => {
+    if (revealedAyahs.length === 0 || !scrollerRef.current) return;
+    const sc = scrollerRef.current;
+    sc.scrollTo({
+      top: sc.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [revealedAyahs.length]);
 
   const advanceOne = (
     ref: AyahReference
@@ -211,9 +221,9 @@ export default function QuizScreen({ range, onBack }: Props) {
       : false;
 
   return (
-    <div className="min-h-screen bg-white animate-fade-in">
-      <div className="max-w-2xl mx-auto p-4">
-        <div className="flex items-center justify-between py-4 mb-6">
+    <div className="h-screen bg-white animate-fade-in flex flex-col overflow-hidden">
+      <div className="max-w-2xl mx-auto w-full px-4 pt-4 pb-4 flex flex-col flex-1 min-h-0">
+        <div className="flex items-center justify-between pb-4 shrink-0">
           <button
             onClick={onBack}
             className="flex items-center gap-2 text-neutral-500 hover:text-neutral-900 transition-colors"
@@ -308,11 +318,15 @@ export default function QuizScreen({ range, onBack }: Props) {
         )}
 
         {loading ? (
-          <div className="flex items-center justify-center py-32 animate-fade-in-soft">
+          <div className="flex items-center justify-center flex-1 animate-fade-in-soft">
             <div className="w-7 h-7 border-2 border-neutral-300 border-t-neutral-900 rounded-full animate-spin" />
           </div>
         ) : (
-          <div key={currentAyah ? `${currentAyah.surah}:${currentAyah.ayah}` : "x"}>
+          <div
+            key={currentAyah ? `${currentAyah.surah}:${currentAyah.ayah}` : "x"}
+            className="flex flex-col flex-1 min-h-0"
+          >
+            <div className="shrink-0">
             {(() => {
               const { text: cleanText, hadBismillah } =
                 currentAyah && !promptOnly
@@ -369,59 +383,68 @@ export default function QuizScreen({ range, onBack }: Props) {
                 </>
               );
             })()}
+            </div>
 
             {revealedAyahs.length > 0 && (
-              <div className="space-y-3 mb-4">
-                {revealedAyahs.map((ra, i) => {
-                  const { text: cleanText, hadBismillah } = stripBismillah(
-                    ra.text,
-                    ra.surah,
-                    ra.ayah
-                  );
-                  return (
-                    <div key={i} className="animate-slide-up">
-                      {hadBismillah && (
-                        <div className="text-center my-5">
-                          {!hideSurahName && (
-                            <div className="text-xs uppercase tracking-widest text-neutral-400 mb-2">
-                              {surahs[ra.surah - 1].nameArabic} —{" "}
-                              {surahs[ra.surah - 1].name}
-                            </div>
-                          )}
-                          <span
-                            className="bismillah-glyph text-2xl text-neutral-700"
-                            dir="rtl"
-                          >
-                            {BISMILLAH_DISPLAY}
-                          </span>
-                        </div>
-                      )}
-                      <div className="bg-white rounded-3xl border border-neutral-200 p-6">
-                        {!hideSurahName && (
-                          <div className="text-center mb-3 flex items-center justify-center gap-2">
-                            <span className="text-xs text-neutral-400">
-                              {surahs[ra.surah - 1].nameArabic} : {ra.ayah}
-                            </span>
-                            {ra.isEndOfSurah && (
-                              <span className="text-[10px] font-medium text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100">
-                                Last ayah
-                              </span>
+              <div
+                ref={scrollerRef}
+                className="reveal-mask scrollbar-hide flex-1 min-h-0 overflow-y-auto -mx-4 px-4"
+              >
+                <div className="space-y-3 py-4">
+                  {revealedAyahs.map((ra, i) => {
+                    const { text: cleanText, hadBismillah } = stripBismillah(
+                      ra.text,
+                      ra.surah,
+                      ra.ayah
+                    );
+                    return (
+                      <div key={i} className="animate-slide-up">
+                        {hadBismillah && (
+                          <div className="text-center mb-3">
+                            {!hideSurahName && (
+                              <div className="text-xs uppercase tracking-widest text-neutral-400 mb-1.5">
+                                {surahs[ra.surah - 1].nameArabic} —{" "}
+                                {surahs[ra.surah - 1].name}
+                              </div>
                             )}
+                            <span
+                              className="bismillah-glyph text-2xl text-neutral-700"
+                              dir="rtl"
+                            >
+                              {BISMILLAH_DISPLAY}
+                            </span>
                           </div>
                         )}
-                        <p
-                          className="font-quran text-2xl leading-[2.2] text-neutral-700 text-right"
-                          dir="rtl"
-                        >
-                          {cleanText}
-                        </p>
+                        <div className="bg-white rounded-3xl border border-neutral-200 p-6">
+                          {!hideSurahName && (
+                            <div className="text-center mb-3 flex items-center justify-center gap-2">
+                              <span className="text-xs text-neutral-400">
+                                {surahs[ra.surah - 1].nameArabic} : {ra.ayah}
+                              </span>
+                              {ra.isEndOfSurah && (
+                                <span className="text-[10px] font-medium text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100">
+                                  Last ayah
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          <p
+                            className="font-quran text-2xl leading-[2.2] text-neutral-700 text-right"
+                            dir="rtl"
+                          >
+                            {cleanText}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             )}
 
+            {revealedAyahs.length === 0 && <div className="flex-1" />}
+
+            <div className="shrink-0 pt-3">
             <div className="flex gap-3 mb-3">
               <button
                 onClick={revealNext}
@@ -443,6 +466,7 @@ export default function QuizScreen({ range, onBack }: Props) {
             >
               Next Random Ayah
             </button>
+            </div>
           </div>
         )}
       </div>
