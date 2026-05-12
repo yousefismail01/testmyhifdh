@@ -101,22 +101,27 @@ export default function QuizScreen({ range, onBack }: Props) {
     }
   }, [ayahPool, rollNewAyah]);
 
+  const rafIdRef = useRef<number | null>(null);
   const updateWheel = useCallback(() => {
-    const sc = scrollerRef.current;
-    if (!sc) return;
-    const cards = sc.querySelectorAll<HTMLElement>("[data-wheel-card]");
-    const r = sc.getBoundingClientRect();
-    const scH = sc.clientHeight;
-    const scCenter = r.top + scH / 2;
-    cards.forEach((card) => {
-      const cr = card.getBoundingClientRect();
-      const cardCenter = cr.top + cr.height / 2;
-      const dist = (cardCenter - scCenter) / (scH / 2);
-      const clamped = Math.max(-1.4, Math.min(1.4, dist));
-      const rotateX = -clamped * 38;
-      const scale = 1 - Math.abs(clamped) * 0.12;
-      const translateZ = -Math.abs(clamped) * 80;
-      card.style.transform = `translateZ(${translateZ}px) rotateX(${rotateX}deg) scale(${scale})`;
+    if (rafIdRef.current !== null) return;
+    rafIdRef.current = requestAnimationFrame(() => {
+      rafIdRef.current = null;
+      const sc = scrollerRef.current;
+      if (!sc) return;
+      const cards = sc.querySelectorAll<HTMLElement>("[data-wheel-card]");
+      const r = sc.getBoundingClientRect();
+      const scH = sc.clientHeight;
+      const scCenter = r.top + scH / 2;
+      cards.forEach((card) => {
+        const cr = card.getBoundingClientRect();
+        const cardCenter = cr.top + cr.height / 2;
+        const dist = (cardCenter - scCenter) / (scH / 2);
+        const clamped = Math.max(-1.6, Math.min(1.6, dist));
+        const rotateX = -clamped * 55;
+        const scale = 1 - Math.abs(clamped) * 0.22;
+        const translateZ = -Math.abs(clamped) * 140;
+        card.style.transform = `translateZ(${translateZ}px) rotateX(${rotateX}deg) scale(${scale})`;
+      });
     });
   }, []);
 
@@ -363,7 +368,7 @@ export default function QuizScreen({ range, onBack }: Props) {
               onScroll={updateWheel}
               className="reveal-mask scrollbar-hide flex-1 min-h-0 overflow-y-auto -mx-4 px-4"
             >
-              <div className="space-y-3 py-12">
+              <div className="space-y-4 py-16">
                 {currentAyah &&
                   (() => {
                     const { text: cleanText, hadBismillah } = !promptOnly
