@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { surahs, juzData } from "../data/quran-meta";
+import type { Settings, SettingsActions } from "../App";
+import SettingsPanel from "./SettingsPanel";
 
 export type RangeMode = "surah" | "juz" | "page";
 
@@ -7,6 +9,8 @@ export interface SelectedRange {
   mode: RangeMode;
   startSurah?: number;
   endSurah?: number;
+  startAyah?: number;
+  endAyah?: number;
   juzNumber?: number;
   startPage?: number;
   endPage?: number;
@@ -14,24 +18,43 @@ export interface SelectedRange {
 
 interface Props {
   onStart: (range: SelectedRange) => void;
+  settings: Settings;
+  actions: SettingsActions;
 }
 
-export default function RangeSelector({ onStart }: Props) {
+export default function RangeSelector({ onStart, settings, actions }: Props) {
   const [mode, setMode] = useState<RangeMode>("juz");
   const [juzNumber, setJuzNumber] = useState(30);
   const [startSurah, setStartSurah] = useState(1);
   const [endSurah, setEndSurah] = useState(1);
+  const [startAyah, setStartAyah] = useState(1);
+  const [endAyah, setEndAyah] = useState(7);
   const [startPage, setStartPage] = useState(1);
   const [endPage, setEndPage] = useState(20);
+  const [showSettings, setShowSettings] = useState(false);
+
+  const startSurahInfo = surahs[startSurah - 1];
+  const endSurahInfo = surahs[endSurah - 1];
+  const effectiveStartAyah = Math.min(startAyah, startSurahInfo.ayahCount);
+  const effectiveEndAyah = Math.min(
+    Math.max(
+      endAyah,
+      startSurah === endSurah ? effectiveStartAyah : 1
+    ),
+    endSurahInfo.ayahCount
+  );
 
   const handleStart = () => {
     if (mode === "juz") {
       onStart({ mode, juzNumber });
     } else if (mode === "surah") {
+      const finalEndSurah = Math.max(startSurah, endSurah);
       onStart({
         mode,
         startSurah,
-        endSurah: Math.max(startSurah, endSurah),
+        endSurah: finalEndSurah,
+        startAyah: effectiveStartAyah,
+        endAyah: effectiveEndAyah,
       });
     } else {
       onStart({
@@ -51,6 +74,44 @@ export default function RangeSelector({ onStart }: Props) {
   return (
     <div className="min-h-screen bg-white dark:bg-neutral-950 flex items-center justify-center p-4 animate-fade-in">
       <div className="w-full max-w-lg">
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={() => setShowSettings((v) => !v)}
+            className={`p-2 rounded-full border transition-all duration-200 ${
+              showSettings
+                ? "bg-neutral-900 dark:bg-neutral-100 border-neutral-900 dark:border-neutral-100 text-white dark:text-neutral-900"
+                : "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:border-neutral-300"
+            }`}
+            aria-label="Settings"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+            </svg>
+          </button>
+        </div>
+
+        {showSettings && (
+          <div className="mb-6">
+            <SettingsPanel settings={settings} actions={actions} />
+          </div>
+        )}
+
         <div className="text-center mb-12 animate-slide-up">
           <h1 className="text-4xl font-medium text-neutral-900 dark:text-neutral-100 tracking-tight">
             testmyhifdh
@@ -64,14 +125,14 @@ export default function RangeSelector({ onStart }: Props) {
           className="bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-6 animate-slide-up"
           style={{ animationDelay: "60ms" }}
         >
-          <div className="flex gap-1 bg-neutral-50 dark:bg-neutral-900 rounded-2xl p-1 mb-6">
+          <div className="flex gap-1 bg-neutral-50 dark:bg-neutral-800 rounded-2xl p-1 mb-6">
             {tabs.map((tab) => (
               <button
                 key={tab.value}
                 onClick={() => setMode(tab.value)}
                 className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-medium transition-all duration-200 ${
                   mode === tab.value
-                    ? "bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-sm"
+                    ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm"
                     : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300"
                 }`}
               >
@@ -94,7 +155,7 @@ export default function RangeSelector({ onStart }: Props) {
                       className={`py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
                         juzNumber === j.number
                           ? "bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900"
-                          : "bg-neutral-50 dark:bg-neutral-900 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                          : "bg-neutral-50 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700"
                       }`}
                     >
                       {j.number}
@@ -106,39 +167,103 @@ export default function RangeSelector({ onStart }: Props) {
 
             {mode === "surah" && (
               <div className="space-y-4">
-                <div>
-                  <label className="block text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-2">
-                    From
-                  </label>
-                  <select
-                    value={startSurah}
-                    onChange={(e) => setStartSurah(Number(e.target.value))}
-                    className="w-full px-4 py-3 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-300 transition-all"
-                  >
-                    {surahs.map((s) => (
-                      <option key={s.number} value={s.number}>
-                        {s.number}. {s.name} — {s.nameArabic}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-2">
-                    To
-                  </label>
-                  <select
-                    value={endSurah}
-                    onChange={(e) => setEndSurah(Number(e.target.value))}
-                    className="w-full px-4 py-3 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-300 transition-all"
-                  >
-                    {surahs
-                      .filter((s) => s.number >= startSurah)
-                      .map((s) => (
+                <div className="grid grid-cols-[1fr_auto] gap-2">
+                  <div>
+                    <label className="block text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-2">
+                      From Surah
+                    </label>
+                    <select
+                      value={startSurah}
+                      onChange={(e) => {
+                        const v = Number(e.target.value);
+                        setStartSurah(v);
+                        if (endSurah < v) setEndSurah(v);
+                        setStartAyah(1);
+                      }}
+                      className="w-full px-4 py-3 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-300 transition-all"
+                    >
+                      {surahs.map((s) => (
                         <option key={s.number} value={s.number}>
                           {s.number}. {s.name} — {s.nameArabic}
                         </option>
                       ))}
-                  </select>
+                    </select>
+                  </div>
+                  <div className="w-24">
+                    <label className="block text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-2">
+                      Ayah
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={startSurahInfo.ayahCount}
+                      value={effectiveStartAyah}
+                      onChange={(e) =>
+                        setStartAyah(
+                          Math.max(
+                            1,
+                            Math.min(
+                              startSurahInfo.ayahCount,
+                              Number(e.target.value)
+                            )
+                          )
+                        )
+                      }
+                      className="w-full px-3 py-3 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-300 transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-[1fr_auto] gap-2">
+                  <div>
+                    <label className="block text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-2">
+                      To Surah
+                    </label>
+                    <select
+                      value={endSurah}
+                      onChange={(e) => {
+                        const v = Number(e.target.value);
+                        setEndSurah(v);
+                        setEndAyah(surahs[v - 1].ayahCount);
+                      }}
+                      className="w-full px-4 py-3 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-300 transition-all"
+                    >
+                      {surahs
+                        .filter((s) => s.number >= startSurah)
+                        .map((s) => (
+                          <option key={s.number} value={s.number}>
+                            {s.number}. {s.name} — {s.nameArabic}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  <div className="w-24">
+                    <label className="block text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-2">
+                      Ayah
+                    </label>
+                    <input
+                      type="number"
+                      min={
+                        startSurah === endSurah ? effectiveStartAyah : 1
+                      }
+                      max={endSurahInfo.ayahCount}
+                      value={effectiveEndAyah}
+                      onChange={(e) =>
+                        setEndAyah(
+                          Math.max(
+                            startSurah === endSurah
+                              ? effectiveStartAyah
+                              : 1,
+                            Math.min(
+                              endSurahInfo.ayahCount,
+                              Number(e.target.value)
+                            )
+                          )
+                        )
+                      }
+                      className="w-full px-3 py-3 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-300 transition-all"
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -159,7 +284,7 @@ export default function RangeSelector({ onStart }: Props) {
                         Math.max(1, Math.min(604, Number(e.target.value)))
                       )
                     }
-                    className="w-full px-4 py-3 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-300 transition-all"
+                    className="w-full px-4 py-3 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-300 transition-all"
                   />
                 </div>
                 <div>
@@ -176,7 +301,7 @@ export default function RangeSelector({ onStart }: Props) {
                         Math.max(startPage, Math.min(604, Number(e.target.value)))
                       )
                     }
-                    className="w-full px-4 py-3 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-300 transition-all"
+                    className="w-full px-4 py-3 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-300 transition-all"
                   />
                 </div>
               </div>

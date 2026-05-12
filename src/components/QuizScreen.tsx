@@ -9,18 +9,16 @@ import {
 } from "../data/quran-meta";
 import { fetchAyahText } from "../data/quran-api";
 import type { SelectedRange } from "./RangeSelector";
-import { usePersistedState } from "../hooks/usePersistedState";
-import type { Theme, FontSize } from "../App";
+import type { Settings, SettingsActions, FontSize } from "../App";
+import SettingsPanel from "./SettingsPanel";
 import { juzData } from "../data/quran-meta";
 
 interface Props {
   range: SelectedRange;
   onBack: () => void;
   onRangeChange: (r: SelectedRange) => void;
-  theme: Theme;
-  setTheme: (t: Theme) => void;
-  fontSize: FontSize;
-  setFontSize: (s: FontSize) => void;
+  settings: Settings;
+  actions: SettingsActions;
 }
 
 function RangePopover({
@@ -36,8 +34,23 @@ function RangePopover({
   const [juzNumber, setJuzNumber] = useState(current.juzNumber ?? 30);
   const [startSurah, setStartSurah] = useState(current.startSurah ?? 1);
   const [endSurah, setEndSurah] = useState(current.endSurah ?? 1);
+  const [startAyah, setStartAyah] = useState(current.startAyah ?? 1);
+  const [endAyah, setEndAyah] = useState(
+    current.endAyah ?? surahs[(current.endSurah ?? 1) - 1].ayahCount
+  );
   const [startPage, setStartPage] = useState(current.startPage ?? 1);
   const [endPage, setEndPage] = useState(current.endPage ?? 20);
+
+  const startSurahInfo = surahs[startSurah - 1];
+  const endSurahInfo = surahs[endSurah - 1];
+  const effectiveStartAyah = Math.max(
+    1,
+    Math.min(startAyah, startSurahInfo.ayahCount)
+  );
+  const effectiveEndAyah = Math.max(
+    startSurah === endSurah ? effectiveStartAyah : 1,
+    Math.min(endAyah, endSurahInfo.ayahCount)
+  );
 
   const apply = () => {
     if (mode === "juz") onApply({ mode, juzNumber });
@@ -46,6 +59,8 @@ function RangePopover({
         mode,
         startSurah,
         endSurah: Math.max(startSurah, endSurah),
+        startAyah: effectiveStartAyah,
+        endAyah: effectiveEndAyah,
       });
     else
       onApply({
@@ -100,39 +115,98 @@ function RangePopover({
 
       {mode === "surah" && (
         <div className="space-y-2">
-          <div>
-            <label className="block text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-1">
-              From
-            </label>
-            <select
-              value={startSurah}
-              onChange={(e) => setStartSurah(Number(e.target.value))}
-              className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10"
-            >
-              {surahs.map((s) => (
-                <option key={s.number} value={s.number}>
-                  {s.number}. {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-1">
-              To
-            </label>
-            <select
-              value={endSurah}
-              onChange={(e) => setEndSurah(Number(e.target.value))}
-              className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10"
-            >
-              {surahs
-                .filter((s) => s.number >= startSurah)
-                .map((s) => (
+          <div className="grid grid-cols-[1fr_auto] gap-2">
+            <div>
+              <label className="block text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-1">
+                From Surah
+              </label>
+              <select
+                value={startSurah}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  setStartSurah(v);
+                  if (endSurah < v) {
+                    setEndSurah(v);
+                    setEndAyah(surahs[v - 1].ayahCount);
+                  }
+                  setStartAyah(1);
+                }}
+                className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10"
+              >
+                {surahs.map((s) => (
                   <option key={s.number} value={s.number}>
                     {s.number}. {s.name}
                   </option>
                 ))}
-            </select>
+              </select>
+            </div>
+            <div className="w-20">
+              <label className="block text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-1">
+                Ayah
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={startSurahInfo.ayahCount}
+                value={effectiveStartAyah}
+                onChange={(e) =>
+                  setStartAyah(
+                    Math.max(
+                      1,
+                      Math.min(
+                        startSurahInfo.ayahCount,
+                        Number(e.target.value)
+                      )
+                    )
+                  )
+                }
+                className="w-full px-2 py-2 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-[1fr_auto] gap-2">
+            <div>
+              <label className="block text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-1">
+                To Surah
+              </label>
+              <select
+                value={endSurah}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  setEndSurah(v);
+                  setEndAyah(surahs[v - 1].ayahCount);
+                }}
+                className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10"
+              >
+                {surahs
+                  .filter((s) => s.number >= startSurah)
+                  .map((s) => (
+                    <option key={s.number} value={s.number}>
+                      {s.number}. {s.name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div className="w-20">
+              <label className="block text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-1">
+                Ayah
+              </label>
+              <input
+                type="number"
+                min={startSurah === endSurah ? effectiveStartAyah : 1}
+                max={endSurahInfo.ayahCount}
+                value={effectiveEndAyah}
+                onChange={(e) =>
+                  setEndAyah(
+                    Math.max(
+                      startSurah === endSurah ? effectiveStartAyah : 1,
+                      Math.min(endSurahInfo.ayahCount, Number(e.target.value))
+                    )
+                  )
+                }
+                className="w-full px-2 py-2 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10"
+              />
+            </div>
           </div>
         </div>
       )}
@@ -213,30 +287,16 @@ export default function QuizScreen({
   range,
   onBack,
   onRangeChange,
-  theme,
-  setTheme,
-  fontSize,
-  setFontSize,
+  settings,
+  actions,
 }: Props) {
+  const { fontSize, hideSurahName, testFirstAyahs, showAyahNumbers } = settings;
   const [ayahPool, setAyahPool] = useState<AyahReference[]>([]);
   const [currentAyah, setCurrentAyah] = useState<AyahReference | null>(null);
   const [ayahText, setAyahText] = useState("");
   const [revealedAyahs, setRevealedAyahs] = useState<RevealedAyah[]>([]);
   const [loading, setLoading] = useState(true);
   const lastRevealedRef = useRef<AyahReference | null>(null);
-
-  const [hideSurahName, setHideSurahName] = usePersistedState(
-    "tmh.hideSurahName",
-    false
-  );
-  const [testFirstAyahs, setTestFirstAyahs] = usePersistedState(
-    "tmh.testFirstAyahs",
-    false
-  );
-  const [showAyahNumbers, setShowAyahNumbers] = usePersistedState(
-    "tmh.showAyahNumbers",
-    true
-  );
 
   const sizes = FONT_SIZES[fontSize];
   const [showSettings, setShowSettings] = useState(false);
@@ -255,7 +315,13 @@ export default function QuizScreen({
     if (range.mode === "juz") {
       r = getJuzRange(range.juzNumber!);
     } else if (range.mode === "surah") {
-      r = getSurahRange(range.startSurah!, range.endSurah!);
+      const base = getSurahRange(range.startSurah!, range.endSurah!);
+      r = {
+        startSurah: base.startSurah,
+        startAyah: range.startAyah ?? base.startAyah,
+        endSurah: base.endSurah,
+        endAyah: range.endAyah ?? base.endAyah,
+      };
     } else {
       const startPage = range.startPage!;
       const endPage = range.endPage!;
@@ -448,9 +514,23 @@ export default function QuizScreen({
   const getRangeLabel = () => {
     if (range.mode === "juz") return `Juz ${range.juzNumber}`;
     if (range.mode === "surah") {
-      if (range.startSurah === range.endSurah)
-        return surahs[range.startSurah! - 1].name;
-      return `${surahs[range.startSurah! - 1].name} – ${surahs[range.endSurah! - 1].name}`;
+      const sName = surahs[range.startSurah! - 1].name;
+      const eName = surahs[range.endSurah! - 1].name;
+      const sCount = surahs[range.startSurah! - 1].ayahCount;
+      const eCount = surahs[range.endSurah! - 1].ayahCount;
+      const sA = range.startAyah ?? 1;
+      const eA = range.endAyah ?? eCount;
+      const sPartial = sA > 1;
+      const ePartial = eA < eCount;
+      if (range.startSurah === range.endSurah) {
+        if (!sPartial && !ePartial) return sName;
+        if (sA === eA) return `${sName} ${sA}`;
+        return `${sName} ${sA}-${eA}`;
+      }
+      const sLabel = sPartial ? `${sName} ${sA}` : sName;
+      const eLabel = ePartial ? `${eName} ${eA}` : eName;
+      void sCount;
+      return `${sLabel} – ${eLabel}`;
     }
     return `Pages ${range.startPage} – ${range.endPage}`;
   };
@@ -579,98 +659,8 @@ export default function QuizScreen({
         )}
 
         {showSettings && (
-          <div className="bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-5 mb-4 space-y-4 animate-fade-in">
-            <label className="flex items-center justify-between cursor-pointer">
-              <div className="pr-4">
-                <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
-                  Hide surah names
-                </div>
-                <div className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
-                  Don't show which surah the ayah is from
-                </div>
-              </div>
-              <input
-                type="checkbox"
-                checked={hideSurahName}
-                onChange={(e) => setHideSurahName(e.target.checked)}
-                className="w-5 h-5 accent-neutral-900 dark:accent-neutral-100 shrink-0"
-              />
-            </label>
-            <label className="flex items-center justify-between cursor-pointer">
-              <div className="pr-4">
-                <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
-                  Test first ayahs
-                </div>
-                <div className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
-                  When the rolled ayah is the first of a surah, show only the
-                  surah name and you guess the ayah
-                </div>
-              </div>
-              <input
-                type="checkbox"
-                checked={testFirstAyahs}
-                onChange={(e) => setTestFirstAyahs(e.target.checked)}
-                className="w-5 h-5 accent-neutral-900 dark:accent-neutral-100 shrink-0"
-              />
-            </label>
-            <label className="flex items-center justify-between cursor-pointer">
-              <div className="pr-4">
-                <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
-                  Show ayah numbers
-                </div>
-                <div className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
-                  Display an end-of-ayah marker with the ayah number
-                </div>
-              </div>
-              <input
-                type="checkbox"
-                checked={showAyahNumbers}
-                onChange={(e) => setShowAyahNumbers(e.target.checked)}
-                className="w-5 h-5 accent-neutral-900 dark:accent-neutral-100 shrink-0"
-              />
-            </label>
-
-            <div className="pt-1">
-              <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200 mb-2">
-                Text size
-              </div>
-              <div className="flex gap-1 bg-neutral-50 dark:bg-neutral-800 rounded-xl p-1">
-                {(["sm", "md", "lg", "xl"] as const).map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setFontSize(s)}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
-                      fontSize === s
-                        ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm"
-                        : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
-                    }`}
-                  >
-                    {s.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="pt-1">
-              <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200 mb-2">
-                Theme
-              </div>
-              <div className="flex gap-1 bg-neutral-50 dark:bg-neutral-800 rounded-xl p-1">
-                {(["light", "dark"] as const).map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setTheme(t)}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 capitalize ${
-                      theme === t
-                        ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm"
-                        : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
-                    }`}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </div>
+          <div className="mb-4">
+            <SettingsPanel settings={settings} actions={actions} />
           </div>
         )}
 
