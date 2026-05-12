@@ -109,13 +109,32 @@ export default function QuizScreen({ range, onBack }: Props) {
       const sc = scrollerRef.current;
       if (!sc) return;
       const cards = sc.querySelectorAll<HTMLElement>("[data-wheel-card]");
-      const r = sc.getBoundingClientRect();
+      if (cards.length === 0) return;
       const scH = sc.clientHeight;
-      const scCenter = r.top + scH / 2;
+      const maxScroll = Math.max(0, sc.scrollHeight - scH);
+      const progress = maxScroll < 1 ? 0 : sc.scrollTop / maxScroll;
+      const scRect = sc.getBoundingClientRect();
+
+      // Use offsetTop (transform-free) to compute each card's natural vertical center
+      // within the scroll content, then map to viewport Y.
+      const centers: number[] = [];
       cards.forEach((card) => {
-        const cr = card.getBoundingClientRect();
-        const cardCenter = cr.top + cr.height / 2;
-        const dist = (cardCenter - scCenter) / (scH / 2);
+        let top = 0;
+        let cur: HTMLElement | null = card;
+        while (cur && cur !== sc) {
+          top += cur.offsetTop;
+          cur = cur.offsetParent as HTMLElement | null;
+        }
+        const naturalCenterInContent = top + card.offsetHeight / 2;
+        centers.push(scRect.top + naturalCenterInContent - sc.scrollTop);
+      });
+
+      const firstCenter = centers[0];
+      const lastCenter = centers[centers.length - 1];
+      const focusY = firstCenter + progress * (lastCenter - firstCenter);
+
+      cards.forEach((card, i) => {
+        const dist = (centers[i] - focusY) / (scH / 2);
         const clamped = Math.max(-1.6, Math.min(1.6, dist));
         const rotateX = -clamped * 55;
         const scale = 1 - Math.abs(clamped) * 0.22;
