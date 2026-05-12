@@ -74,7 +74,7 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
   return (
     <div className="min-h-screen bg-white dark:bg-neutral-950 flex items-center justify-center p-4 animate-fade-in">
       <div className="w-full max-w-lg">
-        <div className="flex justify-between mb-4">
+        <div className="flex justify-end gap-2 mb-4">
           <button
             onClick={() =>
               actions.setTheme(settings.theme === "dark" ? "light" : "dark")
