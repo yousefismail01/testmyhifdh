@@ -72,7 +72,13 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
   ];
 
   return (
-    <div className="min-h-screen bg-white dark:bg-neutral-950 flex items-center justify-center p-4 animate-fade-in">
+    <div
+      className="min-h-screen bg-white dark:bg-neutral-950 flex items-center justify-center p-4 animate-fade-in"
+      style={{
+        paddingTop: "max(1rem, env(safe-area-inset-top))",
+        paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
+      }}
+    >
       <div className="w-full max-w-lg">
         <div className="flex justify-end gap-2 mb-4">
           <button

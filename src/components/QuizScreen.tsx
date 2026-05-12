@@ -543,9 +543,45 @@ export default function QuizScreen({
     lastShown.surah === rangeBounds.endSurah &&
     lastShown.ayah === rangeBounds.endAyah;
 
+  // Swipe-right-to-go-back gesture for mobile / PWA. Recorded on touchstart,
+  // committed on touchend if the swipe is mostly horizontal, > 70px, and
+  // started within the leftmost portion of the viewport so it doesn't fire
+  // accidentally while reading.
+  const swipeStartRef = useRef<{ x: number; y: number; t: number } | null>(null);
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    swipeStartRef.current = { x: t.clientX, y: t.clientY, t: Date.now() };
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const start = swipeStartRef.current;
+    swipeStartRef.current = null;
+    if (!start) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    const dt = Date.now() - start.t;
+    if (
+      dx > 70 &&
+      Math.abs(dx) > Math.abs(dy) * 2 &&
+      dt < 600 &&
+      start.x < window.innerWidth * 0.5
+    ) {
+      onBack();
+    }
+  };
+
   return (
-    <div className="h-screen bg-white dark:bg-neutral-950 animate-fade-in flex flex-col overflow-hidden">
-      <div className="max-w-2xl mx-auto w-full px-4 pt-4 pb-4 flex flex-col flex-1 min-h-0">
+    <div
+      className="h-screen bg-white dark:bg-neutral-950 animate-fade-in flex flex-col overflow-hidden"
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
+      <div
+        className="max-w-2xl mx-auto w-full px-4 pt-4 flex flex-col flex-1 min-h-0"
+        style={{
+          paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
+        }}
+      >
         <div className="flex items-center justify-between pb-4 shrink-0">
           <button
             onClick={onBack}
