@@ -303,48 +303,43 @@ export default function QuizScreen({
   const [promptOnly, setPromptOnly] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
-  const ayahPool = useMemo<AyahReference[]>(() => {
-    let r: {
-      startSurah: number;
-      startAyah: number;
-      endSurah: number;
-      endAyah: number;
-    };
-
+  const rangeBounds = useMemo(() => {
     if (range.mode === "juz") {
-      r = getJuzRange(range.juzNumber!);
-    } else if (range.mode === "surah") {
+      return getJuzRange(range.juzNumber!);
+    }
+    if (range.mode === "surah") {
       const base = getSurahRange(range.startSurah!, range.endSurah!);
-      r = {
+      return {
         startSurah: base.startSurah,
         startAyah: range.startAyah ?? base.startAyah,
         endSurah: base.endSurah,
         endAyah: range.endAyah ?? base.endAyah,
       };
-    } else {
-      const startPage = range.startPage!;
-      const endPage = range.endPage!;
-      let startSurah = 1;
-      let endSurah = 114;
-      for (const s of surahs) {
-        if (s.startPage <= startPage) startSurah = s.number;
-        if (s.startPage <= endPage) endSurah = s.number;
-      }
-      r = {
-        startSurah,
-        startAyah: 1,
-        endSurah,
-        endAyah: surahs[endSurah - 1].ayahCount,
-      };
     }
-
-    return getAyahsInRange(
-      r.startSurah,
-      r.startAyah,
-      r.endSurah,
-      r.endAyah
-    ).filter((a) => a.ayah < surahs[a.surah - 1].ayahCount);
+    const startPage = range.startPage!;
+    const endPage = range.endPage!;
+    let startSurah = 1;
+    let endSurah = 114;
+    for (const s of surahs) {
+      if (s.startPage <= startPage) startSurah = s.number;
+      if (s.startPage <= endPage) endSurah = s.number;
+    }
+    return {
+      startSurah,
+      startAyah: 1,
+      endSurah,
+      endAyah: surahs[endSurah - 1].ayahCount,
+    };
   }, [range]);
+
+  const ayahPool = useMemo<AyahReference[]>(() => {
+    return getAyahsInRange(
+      rangeBounds.startSurah,
+      rangeBounds.startAyah,
+      rangeBounds.endSurah,
+      rangeBounds.endAyah
+    ).filter((a) => a.ayah < surahs[a.surah - 1].ayahCount);
+  }, [rangeBounds]);
 
   const rollNewAyah = useCallback(async () => {
     if (ayahPool.length === 0) return;
@@ -528,6 +523,19 @@ export default function QuizScreen({
       ? currentAyah.ayah === currentSurahInfo.ayahCount
       : false;
 
+  // True once the user has reached the final ayah of the selected range
+  // (either it was the rolled ayah with nothing revealed yet, or they've
+  // revealed forward to it). The reveal buttons disable here.
+  const lastShown =
+    revealedAyahs.length > 0
+      ? revealedAyahs[revealedAyahs.length - 1]
+      : currentAyah;
+  const atRangeEnd =
+    !!lastShown &&
+    !promptOnly &&
+    lastShown.surah === rangeBounds.endSurah &&
+    lastShown.ayah === rangeBounds.endAyah;
+
   return (
     <div className="h-screen bg-white dark:bg-neutral-950 animate-fade-in flex flex-col overflow-hidden">
       <div className="max-w-2xl mx-auto w-full px-4 pt-4 pb-4 flex flex-col flex-1 min-h-0">
@@ -642,7 +650,7 @@ export default function QuizScreen({
               onScroll={updateWheel}
               className="reveal-mask scrollbar-hide flex-1 min-h-0 overflow-y-auto -mx-4 px-4"
             >
-              <div className="space-y-4 pt-12 pb-16">
+              <div className="space-y-6 pt-12 pb-12">
                 {currentAyah &&
                   (() => {
                     const hasBismillahHeader =
@@ -754,6 +762,12 @@ export default function QuizScreen({
                     </div>
                   );
                 })}
+
+                {atRangeEnd && (
+                  <div className="text-center text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 pt-2 pb-4 animate-fade-in-soft">
+                    End of range
+                  </div>
+                )}
               </div>
             </div>
 
@@ -761,13 +775,15 @@ export default function QuizScreen({
             <div className="flex gap-3 mb-3">
               <button
                 onClick={revealNext}
-                className="flex-1 py-3 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 font-medium rounded-xl border border-neutral-200 dark:border-neutral-800 transition-all duration-200 active:scale-[0.99]"
+                disabled={atRangeEnd}
+                className="flex-1 py-3 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 font-medium rounded-xl border border-neutral-200 dark:border-neutral-800 transition-all duration-200 active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none"
               >
                 {promptOnly ? "Reveal First Ayah" : "Reveal Next Ayah"}
               </button>
               <button
                 onClick={revealRemainingPage}
-                className="flex-1 py-3 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 font-medium rounded-xl border border-neutral-200 dark:border-neutral-800 transition-all duration-200 active:scale-[0.99]"
+                disabled={atRangeEnd}
+                className="flex-1 py-3 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 font-medium rounded-xl border border-neutral-200 dark:border-neutral-800 transition-all duration-200 active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none"
               >
                 Reveal More (+10)
               </button>
