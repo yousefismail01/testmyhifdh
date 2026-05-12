@@ -404,46 +404,44 @@ export default function QuizScreen({
         heights.push(r.height);
       });
 
-      // Find the focused card: the topmost card whose top is at or just
-      // below the scroller's top edge. (As the user scrolls down, focus
-      // advances to the next card.)
-      let focusIdx = 0;
+      // Find the last card that's at least partially in the viewport.
+      // Cards after this one have scrolled "below the fold" and should
+      // stack behind the visible region; cards before render naturally.
+      let lastInViewIdx = -1;
       for (let i = 0; i < tops.length; i++) {
-        if (tops[i] >= -8) {
-          focusIdx = i;
-          break;
-        }
-        focusIdx = i;
+        if (tops[i] < scH) lastInViewIdx = i;
+        else break;
       }
+      if (lastInViewIdx === -1) lastInViewIdx = 0;
 
-      const PEEK = 16; // visible peek of each stacked card
+      const PEEK = 16; // visible peek per stacked card
       const STACK_DEPTH = 5;
-      const focusBottom = tops[focusIdx] + heights[focusIdx];
-      let cumulative = focusBottom;
+      // Stack starts where the last in-view card ends (clamped to viewport).
+      const lastBottom = Math.min(
+        tops[lastInViewIdx] + heights[lastInViewIdx],
+        scH
+      );
+      let cumulative = lastBottom;
 
       cards.forEach((card, i) => {
-        const offset = i - focusIdx;
         let ty = 0;
         let scale = 1;
         let opacity = 1;
-        let zIndex = 1000 - Math.abs(offset);
+        let zIndex = 1000;
 
-        if (offset > 0) {
-          // Below focus — tuck behind, leaving a PEEK visible.
+        if (i > lastInViewIdx) {
+          // Below the viewport — tuck behind the last visible card.
+          const offset = i - lastInViewIdx;
           const cardH = heights[i];
           const targetTop = cumulative + PEEK - cardH;
           ty = targetTop - tops[i];
           cumulative += PEEK;
           scale = 1 - Math.min(offset, STACK_DEPTH) * 0.02;
           opacity = offset <= STACK_DEPTH + 2 ? 1 : 0;
-          zIndex = 900 - offset; // behind the focus card
-        } else if (offset < 0) {
-          // Above focus — fade past.
-          const distAbove = Math.abs(offset);
-          opacity = distAbove <= 2 ? 1 - distAbove * 0.4 : 0;
-          scale = 1 - Math.min(distAbove, 3) * 0.03;
-          zIndex = 800 - distAbove;
+          zIndex = 900 - offset; // behind the in-view cards
         }
+        // Cards at or before lastInViewIdx use the identity transform —
+        // they're in/above view and render in their natural flow.
 
         card.style.transformOrigin = "center";
         card.style.transform = `translateY(${ty}px) scale(${scale})`;
