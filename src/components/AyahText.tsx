@@ -8,6 +8,9 @@ interface Props {
   plainText: string;
   /** Optional ayah end marker (e.g. the Arabic-Indic digit). */
   marker?: React.ReactNode;
+  /** Whether the marker should be shown. Also strips the tajweed run's
+   *  baked-in end-of-ayah glyph when false. */
+  showMarker: boolean;
   tajweed: boolean;
   className?: string;
   dir?: "rtl" | "ltr";
@@ -22,14 +25,23 @@ export default function AyahText({
   ayah,
   plainText,
   marker,
+  showMarker,
   tajweed,
   className,
   dir = "rtl",
 }: Props) {
-  const runs = useMemo(
-    () => (tajweed ? getTajweedRuns(surah, ayah) : []),
-    [tajweed, surah, ayah]
-  );
+  const runs = useMemo(() => {
+    if (!tajweed) return [];
+    const base = getTajweedRuns(surah, ayah);
+    if (showMarker || base.length === 0) return base;
+    // The last glyph of the last run is the ayah-end ornament. Strip it
+    // (and any trailing whitespace) when the user has turned off markers.
+    const last = base[base.length - 1];
+    const trimmed = last.t.replace(/.\s*$/u, "");
+    if (trimmed === last.t) return base;
+    if (trimmed.length === 0) return base.slice(0, -1);
+    return [...base.slice(0, -1), { p: last.p, t: trimmed }];
+  }, [tajweed, surah, ayah, showMarker]);
 
   useEffect(() => {
     if (!tajweed) return;
@@ -40,7 +52,7 @@ export default function AyahText({
     return (
       <p className={className} dir={dir}>
         {plainText}
-        {marker}
+        {showMarker ? marker : null}
       </p>
     );
   }

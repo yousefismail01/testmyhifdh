@@ -520,14 +520,12 @@ export default function QuizScreen({
       .join("");
 
   const renderAyahMarker = (ayahNum: number) => {
-    if (!showAyahNumbers) return null;
-    // KFGQPC Nastaleeq has digit-sequence ligatures (e.g. a001_a009_a009)
-    // that combine the Arabic-Indic digits into the Mushaf rosette ornament.
-    // No U+06DD prefix — that draws as a separate empty circle in this font.
+    // KFGQPC has digit-sequence ligatures (e.g. a001_a009_a009) that
+    // combine the Arabic-Indic digits into the Mushaf rosette ornament.
+    // The color is inherited from the parent so the marker reads as part
+    // of the ayah text rather than as a muted decoration.
     return (
-      <span className="font-quran text-neutral-500 dark:text-neutral-400 mx-1">
-        {toArabicIndic(ayahNum)}
-      </span>
+      <span className="font-quran mx-1">{toArabicIndic(ayahNum)}</span>
     );
   };
 
@@ -753,6 +751,7 @@ export default function QuizScreen({
                               ayah={currentAyah.ayah}
                               plainText={ayahText}
                               marker={renderAyahMarker(currentAyah.ayah)}
+                              showMarker={showAyahNumbers}
                               tajweed={tajweed}
                               className={`font-quran ${sizes.current} leading-[2.4] text-neutral-800 dark:text-neutral-200 text-right`}
                             />
@@ -806,6 +805,7 @@ export default function QuizScreen({
                           ayah={ra.ayah}
                           plainText={ra.text}
                           marker={renderAyahMarker(ra.ayah)}
+                          showMarker={showAyahNumbers}
                           tajweed={tajweed}
                           className={`font-quran ${sizes.revealed} leading-[2.2] text-neutral-800 dark:text-neutral-200 text-right`}
                         />
