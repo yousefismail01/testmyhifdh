@@ -404,24 +404,21 @@ export default function QuizScreen({
         heights.push(r.height);
       });
 
-      // Find the last card that's at least partially in the viewport.
-      // Cards after this one have scrolled "below the fold" and should
-      // stack behind the visible region; cards before render naturally.
-      let lastInViewIdx = -1;
-      for (let i = 0; i < tops.length; i++) {
-        if (tops[i] < scH) lastInViewIdx = i;
-        else break;
-      }
-      if (lastInViewIdx === -1) lastInViewIdx = 0;
-
       const PEEK = 16; // visible peek per stacked card
       const STACK_DEPTH = 5;
-      // Stack starts where the last in-view card ends (clamped to viewport).
-      const lastBottom = Math.min(
-        tops[lastInViewIdx] + heights[lastInViewIdx],
-        scH
-      );
-      let cumulative = lastBottom;
+      const stackBandHeight = STACK_DEPTH * PEEK;
+
+      // Find the first card whose bottom is below the stack band — that's
+      // the topmost in-view card. Cards before it have been scrolled past
+      // and pile up at the top.
+      let firstInViewIdx = 0;
+      for (let i = 0; i < tops.length; i++) {
+        if (tops[i] + heights[i] > stackBandHeight) {
+          firstInViewIdx = i;
+          break;
+        }
+        firstInViewIdx = i;
+      }
 
       cards.forEach((card, i) => {
         let ty = 0;
@@ -429,19 +426,23 @@ export default function QuizScreen({
         let opacity = 1;
         let zIndex = 1000;
 
-        if (i > lastInViewIdx) {
-          // Below the viewport — tuck behind the last visible card.
-          const offset = i - lastInViewIdx;
-          const cardH = heights[i];
-          const targetTop = cumulative + PEEK - cardH;
-          ty = targetTop - tops[i];
-          cumulative += PEEK;
-          scale = 1 - Math.min(offset, STACK_DEPTH) * 0.02;
-          opacity = offset <= STACK_DEPTH + 2 ? 1 : 0;
-          zIndex = 900 - offset; // behind the in-view cards
+        if (i < firstInViewIdx) {
+          // Scrolled past — stack at the top of the viewport.
+          const stackOffset = firstInViewIdx - i; // 1 = most recent past
+          if (stackOffset > STACK_DEPTH) {
+            opacity = 0;
+          } else {
+            // slot 0 = oldest visible (top of stack), STACK_DEPTH-1 = freshest
+            const slot = STACK_DEPTH - stackOffset;
+            const targetTop = slot * PEEK;
+            ty = targetTop - tops[i];
+            // Deeper slots are smaller; freshest (highest slot) stays full size.
+            scale = 1 - (STACK_DEPTH - 1 - slot) * 0.02;
+            // Freshest on top of the stack pile.
+            zIndex = 800 + slot;
+          }
         }
-        // Cards at or before lastInViewIdx use the identity transform —
-        // they're in/above view and render in their natural flow.
+        // Cards at or after firstInViewIdx render in natural flow.
 
         card.style.transformOrigin = "center";
         card.style.transform = `translateY(${ty}px) scale(${scale})`;
