@@ -102,15 +102,15 @@ body {
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent 0,
-    black 32px,
-    black calc(100% - 32px),
+    black 24px,
+    black calc(100% - 24px),
     transparent 100%
   );
   mask-image: linear-gradient(
     to bottom,
     transparent 0,
-    black 32px,
-    black calc(100% - 32px),
+    black 24px,
+    black calc(100% - 24px),
     transparent 100%
   );
   overscroll-behavior-y: contain;
@@ -118,7 +118,16 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+.stack-cards {
+  --stack-cards-gap: 14px;
+  --stack-cards-sticky-top: 16px;
+}
+
+.stack-cards__item,
 .wheel-card {
-  transform-origin: center center;
+  position: -webkit-sticky;
+  position: sticky;
+  top: var(--stack-cards-sticky-top, 16px);
+  transform-origin: center top;
   will-change: transform;
 }
