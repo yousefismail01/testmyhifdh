@@ -41,9 +41,12 @@ body {
 
 /* Tajweed text uses the QPC v4 colored font. In dark mode, switch to the
  * font's palette 1 (white base text) via the --tajweed-dark named palette
- * registered for each page font on load. */
+ * registered for each page font on load. overflow-wrap+word-break let
+ * long ayahs wrap at the ZWSP word boundaries baked into the data. */
 .qpc-tajweed {
   font-palette: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 .dark .qpc-tajweed {
   font-palette: --tajweed-dark;

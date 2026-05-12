@@ -278,10 +278,10 @@ const FONT_SIZES: Record<
   FontSize,
   { current: string; revealed: string; bismillah: string }
 > = {
-  sm: { current: "text-2xl", revealed: "text-xl", bismillah: "text-2xl" },
-  md: { current: "text-3xl", revealed: "text-2xl", bismillah: "text-3xl" },
-  lg: { current: "text-4xl", revealed: "text-3xl", bismillah: "text-4xl" },
-  xl: { current: "text-5xl", revealed: "text-4xl", bismillah: "text-5xl" },
+  sm: { current: "text-xl", revealed: "text-xl", bismillah: "text-xl" },
+  md: { current: "text-2xl", revealed: "text-2xl", bismillah: "text-2xl" },
+  lg: { current: "text-3xl", revealed: "text-3xl", bismillah: "text-3xl" },
+  xl: { current: "text-4xl", revealed: "text-4xl", bismillah: "text-4xl" },
 };
 
 interface RevealedAyah {
