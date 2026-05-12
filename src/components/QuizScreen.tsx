@@ -572,16 +572,15 @@ export default function QuizScreen({
 
   return (
     <div
-      className="h-screen bg-white dark:bg-neutral-950 animate-fade-in flex flex-col overflow-hidden"
+      className="bg-white dark:bg-neutral-950 animate-fade-in flex flex-col overflow-hidden h-dvh"
+      style={{
+        paddingTop: "env(safe-area-inset-top)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
-      <div
-        className="max-w-2xl mx-auto w-full px-4 pt-4 flex flex-col flex-1 min-h-0"
-        style={{
-          paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
-        }}
-      >
+      <div className="max-w-2xl mx-auto w-full px-4 pt-4 pb-4 flex flex-col flex-1 min-h-0">
         <div className="flex items-center justify-between pb-4 shrink-0">
           <button
             onClick={onBack}
