@@ -74,7 +74,43 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
   return (
     <div className="min-h-screen bg-white dark:bg-neutral-950 flex items-center justify-center p-4 animate-fade-in">
       <div className="w-full max-w-lg">
-        <div className="flex justify-end mb-4">
+        <div className="flex justify-between mb-4">
+          <button
+            onClick={() =>
+              actions.setTheme(settings.theme === "dark" ? "light" : "dark")
+            }
+            className="p-2 rounded-full border bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:border-neutral-300 transition-all duration-200"
+            aria-label={
+              settings.theme === "dark"
+                ? "Switch to light mode"
+                : "Switch to dark mode"
+            }
+          >
+            {settings.theme === "dark" ? (
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <circle cx="12" cy="12" r="4" strokeWidth={2} />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"
+                />
+              </svg>
+            ) : (
+              <svg
+                className="w-4 h-4"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" />
+              </svg>
+            )}
+          </button>
           <button
             onClick={() => setShowSettings((v) => !v)}
             className={`p-2 rounded-full border transition-all duration-200 ${
