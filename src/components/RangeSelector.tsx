@@ -156,7 +156,7 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
 
         <div className="text-center mb-12 animate-slide-up">
           <h1 className="text-4xl font-medium text-neutral-900 dark:text-neutral-100 tracking-tight">
-            testmyhifdh
+            testmyhifdh.com
           </h1>
           <p className="text-neutral-400 dark:text-neutral-500 text-sm mt-2 tracking-wide">
             test your memorization, ayah by ayah
