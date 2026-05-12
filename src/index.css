@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 @font-face {
-  font-family: 'qpc-nastaleeq';
-  src: url('/fonts/KFGQPCNastaleeq-Regular.woff2') format('woff2');
+  font-family: 'qpc-hafs';
+  src: url('/fonts/UthmanicHafs1Ver18.woff2') format('woff2');
   font-display: swap;
   font-weight: normal;
   font-style: normal;
 }
 
 @theme {
-  --font-quran: 'qpc-nastaleeq', 'Amiri Quran', 'Scheherazade New', serif;
+  --font-quran: 'qpc-hafs', 'Amiri Quran', 'Scheherazade New', serif;
   --font-sans: 'Inter', system-ui, sans-serif;
 }
 
@@ -28,12 +28,12 @@ body {
 }
 
 .font-quran {
-  font-family: 'qpc-nastaleeq', 'Amiri Quran', 'Scheherazade New', serif;
+  font-family: 'qpc-hafs', 'Amiri Quran', 'Scheherazade New', serif;
   font-feature-settings: "kern", "liga", "calt";
 }
 
 .bismillah-glyph {
-  font-family: 'Amiri Quran', 'qpc-nastaleeq', 'Scheherazade New', serif;
+  font-family: 'Amiri Quran', 'qpc-hafs', 'Scheherazade New', serif;
   font-feature-settings: "liga", "calt";
   line-height: 1.6;
   display: inline-block;
