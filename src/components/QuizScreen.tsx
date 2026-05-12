@@ -1,4 +1,11 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import {
+  Fragment,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import {
   surahs,
   getAyahsInRange,
@@ -650,7 +657,7 @@ export default function QuizScreen({
               onScroll={updateWheel}
               className="reveal-mask scrollbar-hide flex-1 min-h-0 overflow-y-auto -mx-4 px-4"
             >
-              <div className="space-y-6 pt-12 pb-12">
+              <div className="flex flex-col gap-6 pt-12 pb-12">
                 {currentAyah &&
                   (() => {
                     const hasBismillahHeader =
@@ -718,7 +725,7 @@ export default function QuizScreen({
                     ra.ayah
                   );
                   return (
-                    <div key={i} className="contents">
+                    <Fragment key={i}>
                       {hasBismillahHeader && (
                         <div className="text-center my-4 animate-fade-in-soft">
                           {!hideSurahName && (
@@ -759,7 +766,7 @@ export default function QuizScreen({
                           {renderAyahMarker(ra.ayah)}
                         </p>
                       </div>
-                    </div>
+                    </Fragment>
                   );
                 })}
 
