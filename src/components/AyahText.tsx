@@ -4,34 +4,30 @@ import { ensurePageFont, getTajweedRuns } from "../data/quran-tajweed";
 interface Props {
   surah: number;
   ayah: number;
-  /** Plain Uthmani text (used when tajweed is off). */
-  plainText: string;
-  /** Optional ayah end marker (e.g. the Arabic-Indic digit). */
-  marker?: React.ReactNode;
-  /** Whether the marker should be shown. Also strips the tajweed run's
-   *  baked-in end-of-ayah glyph when false. */
-  showMarker: boolean;
+  /** When true, render with the QPC v4 colored palette; otherwise the
+   *  font's monochrome palette so the text looks like a normal Mushaf. */
   tajweed: boolean;
+  /** When false, strip the final glyph (the end-of-ayah ornament) from
+   *  the last run so the verse ends cleanly. */
+  showMarker: boolean;
   className?: string;
   dir?: "rtl" | "ltr";
 }
 
 /**
- * Renders an ayah either as the plain Uthmani text (default) or as a
- * per-page-font tajweed-colored composition (when tajweed is enabled).
+ * Renders an ayah using the QPC v4 per-page font system. A single font
+ * set covers both tajweed-colored and plain-Mushaf rendering — the
+ * `tajweed` prop just toggles which CPAL palette of the font is active.
  */
 export default function AyahText({
   surah,
   ayah,
-  plainText,
-  marker,
-  showMarker,
   tajweed,
+  showMarker,
   className,
   dir = "rtl",
 }: Props) {
   const runs = useMemo(() => {
-    if (!tajweed) return [];
     const base = getTajweedRuns(surah, ayah);
     if (showMarker || base.length === 0) return base;
     // The last glyph of the last run is the ayah-end ornament. Strip it
@@ -41,32 +37,24 @@ export default function AyahText({
     if (trimmed === last.t) return base;
     if (trimmed.length === 0) return base.slice(0, -1);
     return [...base.slice(0, -1), { p: last.p, t: trimmed }];
-  }, [tajweed, surah, ayah, showMarker]);
+  }, [surah, ayah, showMarker]);
 
   useEffect(() => {
-    if (!tajweed) return;
     for (const run of runs) ensurePageFont(run.p);
-  }, [tajweed, runs]);
+  }, [runs]);
 
-  if (!tajweed || runs.length === 0) {
-    return (
-      <p className={className} dir={dir}>
-        {plainText}
-        {showMarker ? marker : null}
-      </p>
-    );
-  }
+  const classes = [
+    className ?? "",
+    "qpc-page-text",
+    tajweed ? "qpc-tajweed" : "qpc-plain",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
-  // The QPC v4 word data already includes the end-of-ayah marker glyph,
-  // so don't duplicate it with the standalone marker prop. The qpc-tajweed
-  // class lets dark-mode CSS swap to the font's white-base palette.
   return (
-    <p className={`${className ?? ""} qpc-tajweed`.trim()} dir={dir}>
+    <p className={classes} dir={dir}>
       {runs.map((run, i) => (
-        <span
-          key={i}
-          style={{ fontFamily: `'qpc-v4-p${run.p}'` }}
-        >
+        <span key={i} style={{ fontFamily: `'qpc-v4-p${run.p}'` }}>
           {run.t}
         </span>
       ))}

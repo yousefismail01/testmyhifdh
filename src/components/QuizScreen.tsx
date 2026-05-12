@@ -14,7 +14,6 @@ import {
   pickWeightedRandomAyah,
   type AyahReference,
 } from "../data/quran-meta";
-import { fetchAyahText } from "../data/quran-api";
 import type { SelectedRange } from "./RangeSelector";
 import type { Settings, SettingsActions, FontSize } from "../App";
 import SettingsPanel from "./SettingsPanel";
@@ -287,7 +286,6 @@ const FONT_SIZES: Record<
 interface RevealedAyah {
   surah: number;
   ayah: number;
-  text: string;
   isEndOfSurah: boolean;
 }
 
@@ -306,7 +304,6 @@ export default function QuizScreen({
     tajweed,
   } = settings;
   const [currentAyah, setCurrentAyah] = useState<AyahReference | null>(null);
-  const [ayahText, setAyahText] = useState("");
   const [revealedAyahs, setRevealedAyahs] = useState<RevealedAyah[]>([]);
   const [loading, setLoading] = useState(true);
   const lastRevealedRef = useRef<AyahReference | null>(null);
@@ -355,24 +352,14 @@ export default function QuizScreen({
     ).filter((a) => a.ayah < surahs[a.surah - 1].ayahCount);
   }, [rangeBounds]);
 
-  const rollNewAyah = useCallback(async () => {
+  const rollNewAyah = useCallback(() => {
     if (ayahPool.length === 0) return;
     setLoading(true);
     setRevealedAyahs([]);
-
     const picked = pickWeightedRandomAyah(ayahPool);
     setCurrentAyah(picked);
     lastRevealedRef.current = picked;
-
-    const shouldHide = testFirstAyahs && picked.ayah === 1;
-    setPromptOnly(shouldHide);
-
-    if (shouldHide) {
-      setAyahText("");
-    } else {
-      const text = await fetchAyahText(picked.surah, picked.ayah);
-      setAyahText(text);
-    }
+    setPromptOnly(testFirstAyahs && picked.ayah === 1);
     setLoading(false);
   }, [ayahPool, testFirstAyahs]);
 
@@ -421,19 +408,17 @@ export default function QuizScreen({
     return null;
   };
 
-  const revealNext = async () => {
+  const revealNext = () => {
     if (!currentAyah || !lastRevealedRef.current) return;
 
     if (promptOnly) {
-      const text = await fetchAyahText(currentAyah.surah, 1);
       const surahInfo = surahs[currentAyah.surah - 1];
-      setAyahText(text);
       setPromptOnly(false);
       lastRevealedRef.current = { surah: currentAyah.surah, ayah: 1 };
       if (surahInfo.ayahCount === 1) {
         setRevealedAyahs((prev) => [
           ...prev,
-          { surah: currentAyah.surah, ayah: 1, text, isEndOfSurah: true },
+          { surah: currentAyah.surah, ayah: 1, isEndOfSurah: true },
         ]);
       }
       return;
@@ -441,8 +426,6 @@ export default function QuizScreen({
 
     const nextRef = advanceOne(lastRevealedRef.current);
     if (!nextRef) return;
-
-    const text = await fetchAyahText(nextRef.surah, nextRef.ayah);
     const nextSurahInfo = surahs[nextRef.surah - 1];
     lastRevealedRef.current = nextRef;
     setRevealedAyahs((prev) => [
@@ -450,17 +433,16 @@ export default function QuizScreen({
       {
         surah: nextRef.surah,
         ayah: nextRef.ayah,
-        text,
         isEndOfSurah: nextRef.ayah === nextSurahInfo.ayahCount,
       },
     ]);
   };
 
-  const revealRemainingPage = async () => {
+  const revealRemainingPage = () => {
     if (!currentAyah || !lastRevealedRef.current) return;
 
     if (promptOnly) {
-      await revealNext();
+      revealNext();
       return;
     }
 
@@ -469,12 +451,10 @@ export default function QuizScreen({
     for (let i = 0; i < 10; i++) {
       const nextRef = advanceOne(cursor);
       if (!nextRef) break;
-      const text = await fetchAyahText(nextRef.surah, nextRef.ayah);
       const surahInfo = surahs[nextRef.surah - 1];
       newRevealed.push({
         surah: nextRef.surah,
         ayah: nextRef.ayah,
-        text,
         isEndOfSurah: nextRef.ayah === surahInfo.ayahCount,
       });
       cursor = nextRef;
@@ -513,21 +493,6 @@ export default function QuizScreen({
   const showsBismillahHeader = (surah: number, ayah: number): boolean =>
     ayah === 1 && surah !== 1 && surah !== 9;
 
-  const toArabicIndic = (n: number): string =>
-    String(n)
-      .split("")
-      .map((d) => String.fromCharCode(0x0660 + parseInt(d, 10)))
-      .join("");
-
-  const renderAyahMarker = (ayahNum: number) => {
-    // KFGQPC has digit-sequence ligatures (e.g. a001_a009_a009) that
-    // combine the Arabic-Indic digits into the Mushaf rosette ornament.
-    // The color is inherited from the parent so the marker reads as part
-    // of the ayah text rather than as a muted decoration.
-    return (
-      <span className="font-quran mx-1">{toArabicIndic(ayahNum)}</span>
-    );
-  };
 
   const currentSurahInfo = currentAyah ? surahs[currentAyah.surah - 1] : null;
   const isLastAyah =
@@ -749,8 +714,6 @@ export default function QuizScreen({
                             <AyahText
                               surah={currentAyah.surah}
                               ayah={currentAyah.ayah}
-                              plainText={ayahText}
-                              marker={renderAyahMarker(currentAyah.ayah)}
                               showMarker={showAyahNumbers}
                               tajweed={tajweed}
                               className={`font-quran ${sizes.current} leading-[2.4] text-neutral-800 dark:text-neutral-200 text-right`}
@@ -803,8 +766,6 @@ export default function QuizScreen({
                         <AyahText
                           surah={ra.surah}
                           ayah={ra.ayah}
-                          plainText={ra.text}
-                          marker={renderAyahMarker(ra.ayah)}
                           showMarker={showAyahNumbers}
                           tajweed={tajweed}
                           className={`font-quran ${sizes.revealed} leading-[2.2] text-neutral-800 dark:text-neutral-200 text-right`}

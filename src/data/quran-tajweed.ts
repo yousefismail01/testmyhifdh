@@ -43,9 +43,17 @@ export function ensurePageFont(page: number): void {
   } catch {
     /* fontface unsupported — degrade gracefully */
   }
+  // The QPC v4 font ships 6 CPAL palettes. We reference three named:
+  //   palette 0 (default)      — black base text + tajweed colors  (tajweed, light)
+  //   palette 1 (--tajweed-dark) — white base text + tajweed colors  (tajweed, dark)
+  //   palette 3 (--qpc-plain)   — all black                          (plain, light)
+  //   palette 4 (--qpc-plain-dark) — all white                       (plain, dark)
   try {
     const style = document.createElement("style");
-    style.textContent = `@font-palette-values --tajweed-dark { font-family: "${family}"; base-palette: 1; }`;
+    style.textContent =
+      `@font-palette-values --tajweed-dark { font-family: "${family}"; base-palette: 1; }` +
+      `@font-palette-values --qpc-plain { font-family: "${family}"; base-palette: 3; }` +
+      `@font-palette-values --qpc-plain-dark { font-family: "${family}"; base-palette: 4; }`;
     document.head.appendChild(style);
   } catch {
     /* font-palette-values unsupported — non-fatal */

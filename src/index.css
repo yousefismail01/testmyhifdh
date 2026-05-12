@@ -39,14 +39,28 @@ body {
   font-feature-settings: "kern", "liga", "calt";
 }
 
-/* Tajweed text uses the QPC v4 colored font. In dark mode, switch to the
- * font's palette 1 (white base text) via the --tajweed-dark named palette
- * registered for each page font on load. overflow-wrap+word-break let
- * long ayahs wrap at the ZWSP word boundaries baked into the data. */
-.qpc-tajweed {
-  font-palette: normal;
+/* All ayah text is rendered with the QPC v4 per-page font system. The
+ * tajweed/plain toggle and the theme combine to pick one of the font's
+ * four palettes via the @font-palette-values rules registered per page
+ * font on first use:
+ *   plain   + light → palette 3 (all black)         → --qpc-plain
+ *   plain   + dark  → palette 4 (all white)         → --qpc-plain-dark
+ *   tajweed + light → palette 0 (black + colors)    → normal (default)
+ *   tajweed + dark  → palette 1 (white + colors)    → --tajweed-dark
+ * overflow-wrap lets long ayahs break at the ZWSP word boundaries baked
+ * into the data so they stay inside the card. */
+.qpc-page-text {
   overflow-wrap: break-word;
   word-break: normal;
+}
+.qpc-plain {
+  font-palette: --qpc-plain;
+}
+.dark .qpc-plain {
+  font-palette: --qpc-plain-dark;
+}
+.qpc-tajweed {
+  font-palette: normal;
 }
 .dark .qpc-tajweed {
   font-palette: --tajweed-dark;
