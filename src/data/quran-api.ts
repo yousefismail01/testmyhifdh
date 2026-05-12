@@ -2,13 +2,14 @@ import ayahsData from "./ayahs.json";
 
 const data = ayahsData as Record<string, string>;
 
-export function getAyahText(surah: number, ayah: number): string {
-  return data[`${surah}:${ayah}`] ?? "";
-}
-
+/**
+ * Returns the QPC Hafs Unicode text for the given surah:ayah, or an empty
+ * string if the key is missing. Async to keep room for swapping in a
+ * network source later without rewriting call sites.
+ */
 export async function fetchAyahText(
   surah: number,
   ayah: number
 ): Promise<string> {
-  return getAyahText(surah, ayah);
+  return data[`${surah}:${ayah}`] ?? "";
 }

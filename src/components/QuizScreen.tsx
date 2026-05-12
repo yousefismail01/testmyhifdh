@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   surahs,
   getAyahsInRange,
@@ -291,7 +291,6 @@ export default function QuizScreen({
   actions,
 }: Props) {
   const { fontSize, hideSurahName, testFirstAyahs, showAyahNumbers } = settings;
-  const [ayahPool, setAyahPool] = useState<AyahReference[]>([]);
   const [currentAyah, setCurrentAyah] = useState<AyahReference | null>(null);
   const [ayahText, setAyahText] = useState("");
   const [revealedAyahs, setRevealedAyahs] = useState<RevealedAyah[]>([]);
@@ -304,7 +303,7 @@ export default function QuizScreen({
   const [promptOnly, setPromptOnly] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
+  const ayahPool = useMemo<AyahReference[]>(() => {
     let r: {
       startSurah: number;
       startAyah: number;
@@ -339,13 +338,12 @@ export default function QuizScreen({
       };
     }
 
-    const pool = getAyahsInRange(
+    return getAyahsInRange(
       r.startSurah,
       r.startAyah,
       r.endSurah,
       r.endAyah
     ).filter((a) => a.ayah < surahs[a.surah - 1].ayahCount);
-    setAyahPool(pool);
   }, [range]);
 
   const rollNewAyah = useCallback(async () => {
@@ -369,8 +367,12 @@ export default function QuizScreen({
     setLoading(false);
   }, [ayahPool, testFirstAyahs]);
 
+  // Auto-roll a fresh ayah whenever the pool changes (e.g. user picked a
+  // new range). rollNewAyah sets state internally; that's exactly what
+  // we want to react to here.
   useEffect(() => {
     if (ayahPool.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       rollNewAyah();
     }
   }, [ayahPool, rollNewAyah]);

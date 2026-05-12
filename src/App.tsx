@@ -79,9 +79,13 @@ export default function App() {
     }
   }, [theme]);
 
+  // Coordinated cross-fade between the setup and quiz screens. The
+  // setState-in-effect pattern is intentional here: it sequences a
+  // 200ms fade-out, a swap of the rendered screen, then a fade-in.
   useEffect(() => {
     const next = range ? "quiz" : "setup";
     if (next === visible) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTransitioning(true);
     const t = setTimeout(() => {
       setVisible(next);
