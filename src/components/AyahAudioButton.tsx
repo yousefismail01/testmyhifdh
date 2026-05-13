@@ -1,48 +1,64 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  getReciter,
+  loadReciterSegments,
+  type ReciterId,
+} from "../data/reciters";
+import { takeAudioFocus, releaseAudioFocus } from "../lib/audio-focus";
 
 interface Props {
   surah: number;
   ayah: number;
+  reciter: ReciterId;
   ariaLabel?: string;
+  /** Visual size — "lg" is used in audio-only mode as the prompt's main affordance. */
+  size?: "default" | "lg";
+  /** If true, start playback automatically once on mount. */
+  autoPlay?: boolean;
+  /** Playback volume, 0–100. Applied at element creation and live-updated. */
+  volume?: number;
 }
 
 /**
- * Module-level handle to whichever AyahAudioButton is currently playing.
- * Before any button starts playback, it calls `stop()` on the registered
- * holder to silence the previous ayah. The holder is cleared again on
- * pause / end / unmount so the next start doesn't bother calling a
- * stale closure. There's only ever zero or one entry — single-track UX,
- * no playlists.
+ * Module-level audio-focus holder. Whichever AyahAudioButton is
+ * currently playing registers a `stop()` closure here; starting any
+ * other button calls that closure first so the previous ayah silences
+ * before the new one begins. Single-track UX, no overlapping playback.
  */
-let currentHolder: { stop: () => void } | null = null;
-
-function takeAudioFocus(holder: { stop: () => void }) {
-  if (currentHolder && currentHolder !== holder) currentHolder.stop();
-  currentHolder = holder;
-}
-
-function releaseAudioFocus(holder: { stop: () => void }) {
-  if (currentHolder === holder) currentHolder = null;
-}
+// Audio-focus helpers live in lib/audio-focus.ts so they can be shared
+// between this component and the QuizScreen hint snippet without
+// triggering React Fast Refresh warnings (which fire when a component
+// file also exports non-component helpers).
 
 /**
- * Tiny play/pause button that streams a single ayah from Tarteel's CDN
- * (Husary recitation). The HTMLAudioElement is created lazily on first
- * click so we don't fetch audio you never asked for.
+ * Play/pause button for a single ayah's recitation. Handles both
+ * delivery modes:
  *
- * Only one ayah can play at a time across the whole app — starting a
- * new one pauses whichever was previously playing via the module-level
- * `currentHolder` above. A new prompt rolling unmounts this component
- * (its key includes surah:ayah); the unmount effect tears the audio
- * element down and releases audio focus.
+ *   "ayah"   — load the per-ayah MP3, play start to end.
+ *   "surah"  — load the whole-surah MP3 once per surah, seek to the
+ *              ayah's `from` timestamp on play, and stop when
+ *              currentTime crosses `to`. Segment data is fetched on
+ *              demand and cached per reciter.
+ *
+ * Only one ayah can play across the app at a time (see audio-focus
+ * holder above). Switching reciter mid-listen tears the current audio
+ * element down so the next click loads a fresh one with the right URL.
  */
-export default function AyahAudioButton({ surah, ayah, ariaLabel }: Props) {
+export default function AyahAudioButton({
+  surah,
+  ayah,
+  reciter,
+  ariaLabel,
+  size = "default",
+  autoPlay = false,
+  volume = 100,
+}: Props) {
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // For surah-mode reciters: the time (in seconds) we should stop at.
+  const stopAtRef = useRef<number | null>(null);
 
-  // Stable per-instance holder reference — registered with the singleton
-  // when this button starts playing, cleared when it stops or unmounts.
   const holderRef = useRef<{ stop: () => void }>({
     stop: () => {
       const a = audioRef.current;
@@ -50,7 +66,6 @@ export default function AyahAudioButton({ surah, ayah, ariaLabel }: Props) {
     },
   });
 
-  // Make sure audio stops if the component is removed mid-playback.
   useEffect(() => {
     const holder = holderRef.current;
     return () => {
@@ -63,7 +78,140 @@ export default function AyahAudioButton({ surah, ayah, ariaLabel }: Props) {
     };
   }, []);
 
+  // Live-apply volume changes to a currently-loaded audio element.
+  useEffect(() => {
+    const a = audioRef.current;
+    if (a) a.volume = Math.max(0, Math.min(1, volume / 100));
+  }, [volume]);
+
+  // Reciter changed mid-flight: tear down so the next click builds a
+  // fresh element with the new URL / segment data.
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    a.pause();
+    a.src = "";
+    audioRef.current = null;
+    stopAtRef.current = null;
+    setPlaying(false);
+    setLoading(false);
+    releaseAudioFocus(holderRef.current);
+  }, [reciter]);
+
+  // (Autoplay effect is installed further down, after start*Mode are
+  // declared — function const TDZ. We don't use a ref guard here: the
+  // setTimeout/clearTimeout pair below makes StrictMode's double-effect
+  // safe, and remounting (new surah:ayah key) is the only signal we
+  // need to fire again.)
+
+  const buildAyahAudio = (): HTMLAudioElement => {
+    const info = getReciter(reciter);
+    const a = new Audio(info.audioUrl(surah, ayah));
+    a.preload = "none";
+    a.volume = Math.max(0, Math.min(1, volume / 100));
+    a.addEventListener("ended", () => {
+      setPlaying(false);
+      releaseAudioFocus(holderRef.current);
+    });
+    a.addEventListener("pause", () => {
+      if (!a.ended) setPlaying(false);
+      releaseAudioFocus(holderRef.current);
+    });
+    a.addEventListener("playing", () => {
+      setLoading(false);
+      setPlaying(true);
+    });
+    a.addEventListener("waiting", () => setLoading(true));
+    a.addEventListener("error", () => {
+      setLoading(false);
+      setPlaying(false);
+      releaseAudioFocus(holderRef.current);
+    });
+    return a;
+  };
+
+  const startAyahMode = () => {
+    const a = buildAyahAudio();
+    audioRef.current = a;
+    setLoading(true);
+    takeAudioFocus(holderRef.current);
+    a.play().catch(() => {
+      setLoading(false);
+      setPlaying(false);
+      releaseAudioFocus(holderRef.current);
+    });
+  };
+
+  const startSurahMode = async () => {
+    setLoading(true);
+    takeAudioFocus(holderRef.current);
+    const info = getReciter(reciter);
+    const segments = await loadReciterSegments(reciter);
+    const seg = segments[`${surah}:${ayah}`];
+    if (!seg) {
+      // No segment data for this ayah — fall back to playing from start.
+      // Better than silently doing nothing.
+      const a = buildAyahAudio();
+      a.src = info.audioUrl(surah, ayah);
+      audioRef.current = a;
+      a.play().catch(() => {
+        setLoading(false);
+        setPlaying(false);
+        releaseAudioFocus(holderRef.current);
+      });
+      return;
+    }
+    const [fromMs, toMs] = seg;
+    const a = buildAyahAudio();
+    a.src = info.audioUrl(surah, ayah);
+    stopAtRef.current = toMs / 1000;
+    // Seek as soon as enough data has loaded; some browsers ignore
+    // currentTime assignment before metadata is parsed.
+    const onLoaded = () => {
+      a.currentTime = fromMs / 1000;
+      a.removeEventListener("loadedmetadata", onLoaded);
+    };
+    a.addEventListener("loadedmetadata", onLoaded);
+    a.addEventListener("timeupdate", () => {
+      const stopAt = stopAtRef.current;
+      if (stopAt != null && a.currentTime >= stopAt) {
+        a.pause();
+        // Manually fire "ended" semantics — we stopped mid-stream.
+        setPlaying(false);
+        releaseAudioFocus(holderRef.current);
+        stopAtRef.current = null;
+      }
+    });
+    audioRef.current = a;
+    a.play().catch(() => {
+      setLoading(false);
+      setPlaying(false);
+      releaseAudioFocus(holderRef.current);
+    });
+  };
+
+  // Auto-play when the setting is on. Schedules one micro-tick so any
+  // reciter-change teardown effect can run first, and so React's
+  // StrictMode double-invoke is safely cancelled by the cleanup before
+  // the timer fires.
+  /* eslint-disable react-hooks/exhaustive-deps */
+  useEffect(() => {
+    if (!autoPlay) return;
+    const id = window.setTimeout(() => {
+      // Don't override an audio element already created by a manual
+      // click — let the user keep control if they started playback
+      // themselves.
+      if (audioRef.current) return;
+      const info = getReciter(reciter);
+      if (info.mode === "ayah") startAyahMode();
+      else void startSurahMode();
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [autoPlay, reciter]);
+  /* eslint-enable react-hooks/exhaustive-deps */
+
   const toggle = () => {
+    // Already have an element — toggle pause/resume.
     if (audioRef.current && playing) {
       audioRef.current.pause();
       setPlaying(false);
@@ -79,46 +227,17 @@ export default function AyahAudioButton({ surah, ayah, ariaLabel }: Props) {
       setPlaying(true);
       return;
     }
-    // First click: create the element. Mahmoud Khalil Al-Husary,
-    // Murattal Hafs — the gold-standard recitation for memorization
-    // (measured pace, complete vowelization, perfect tajweed). Served
-    // by Tarteel's CDN; URL pattern verified against their 6,236-ayah
-    // manifest.
-    const url = `https://audio-cdn.tarteel.ai/quran/husary/${String(
-      surah
-    ).padStart(3, "0")}${String(ayah).padStart(3, "0")}.mp3`;
-    const a = new Audio(url);
-    a.preload = "none";
-    a.addEventListener("ended", () => {
-      setPlaying(false);
-      releaseAudioFocus(holderRef.current);
-    });
-    a.addEventListener("pause", () => {
-      // Pause fires on both manual pause and end; only flip state if
-      // we're not at end (end already fired). Either way the singleton
-      // pointer should drop so the next button doesn't shadow-pause us.
-      if (!a.ended) setPlaying(false);
-      releaseAudioFocus(holderRef.current);
-    });
-    a.addEventListener("playing", () => {
-      setLoading(false);
-      setPlaying(true);
-    });
-    a.addEventListener("waiting", () => setLoading(true));
-    a.addEventListener("error", () => {
-      setLoading(false);
-      setPlaying(false);
-      releaseAudioFocus(holderRef.current);
-    });
-    audioRef.current = a;
-    setLoading(true);
-    takeAudioFocus(holderRef.current);
-    a.play().catch(() => {
-      setLoading(false);
-      setPlaying(false);
-      releaseAudioFocus(holderRef.current);
-    });
+    // First click: kick off the appropriate flow.
+    const info = getReciter(reciter);
+    if (info.mode === "ayah") startAyahMode();
+    else void startSurahMode();
   };
+
+  const isLg = size === "lg";
+  const btnClass = isLg
+    ? "inline-flex items-center justify-center w-20 h-20 rounded-full bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 active:scale-95 transition-all duration-150 shadow-lg shadow-neutral-900/10"
+    : "inline-flex items-center justify-center w-7 h-7 rounded-full text-neutral-400 dark:text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors";
+  const iconClass = isLg ? "w-8 h-8" : "w-3.5 h-3.5";
 
   return (
     <button
@@ -126,11 +245,11 @@ export default function AyahAudioButton({ surah, ayah, ariaLabel }: Props) {
       onClick={toggle}
       aria-label={ariaLabel ?? "Play ayah"}
       aria-pressed={playing}
-      className="inline-flex items-center justify-center w-7 h-7 rounded-full text-neutral-400 dark:text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+      className={btnClass}
     >
       {loading ? (
         <svg
-          className="w-3.5 h-3.5 animate-spin"
+          className={`${iconClass} animate-spin`}
           fill="none"
           viewBox="0 0 24 24"
         >
@@ -150,12 +269,12 @@ export default function AyahAudioButton({ surah, ayah, ariaLabel }: Props) {
           />
         </svg>
       ) : playing ? (
-        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+        <svg className={iconClass} fill="currentColor" viewBox="0 0 24 24">
           <rect x="6" y="5" width="4" height="14" rx="1" />
           <rect x="14" y="5" width="4" height="14" rx="1" />
         </svg>
       ) : (
-        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+        <svg className={iconClass} fill="currentColor" viewBox="0 0 24 24">
           <path d="M8 5v14l11-7z" />
         </svg>
       )}

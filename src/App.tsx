@@ -5,6 +5,9 @@ import { usePersistedState } from "./hooks/usePersistedState";
 import type { Language } from "./i18n/translations";
 import { isRTL } from "./i18n/translations";
 import { loadTajweed } from "./data/quran-tajweed";
+import { loadTranslation } from "./data/translations-en";
+import { loadSimilar } from "./data/similar-ayahs";
+import type { ReciterId } from "./data/reciters";
 
 export type Theme = "light" | "dark";
 /** Quran-text font size in CSS pixels. 16–48 inclusive, integer steps. */
@@ -21,6 +24,17 @@ export interface Settings {
   showAyahNumbers: boolean;
   tajweed: boolean;
   language: Language;
+  reciter: ReciterId;
+  /** Hide the prompt's Arabic text — the user listens to recite. */
+  audioOnly: boolean;
+  /** Start audio playback automatically whenever a new ayah rolls. */
+  autoPlay: boolean;
+  /** Output volume for ayah playback, 0–100. */
+  volume: number;
+  /** Show English translation beneath each ayah as a hint. */
+  showTranslation: boolean;
+  /** Show "this ayah has similar wording in X:Y" cross-references. */
+  showSimilarPhrases: boolean;
 }
 
 export interface SettingsActions {
@@ -31,6 +45,12 @@ export interface SettingsActions {
   setShowAyahNumbers: React.Dispatch<React.SetStateAction<boolean>>;
   setTajweed: React.Dispatch<React.SetStateAction<boolean>>;
   setLanguage: React.Dispatch<React.SetStateAction<Language>>;
+  setReciter: React.Dispatch<React.SetStateAction<ReciterId>>;
+  setAudioOnly: React.Dispatch<React.SetStateAction<boolean>>;
+  setAutoPlay: React.Dispatch<React.SetStateAction<boolean>>;
+  setVolume: React.Dispatch<React.SetStateAction<number>>;
+  setShowTranslation: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowSimilarPhrases: React.Dispatch<React.SetStateAction<boolean>>;
   resetSettings: () => void;
 }
 
@@ -63,6 +83,24 @@ export default function App() {
     "tmh.language",
     "en"
   );
+  const [reciter, setReciter] = usePersistedState<ReciterId>(
+    "tmh.reciter",
+    "husary"
+  );
+  const [audioOnly, setAudioOnly] = usePersistedState(
+    "tmh.audioOnly",
+    false
+  );
+  const [autoPlay, setAutoPlay] = usePersistedState("tmh.autoPlay", false);
+  const [volume, setVolume] = usePersistedState<number>("tmh.volume", 100);
+  const [showTranslation, setShowTranslation] = usePersistedState(
+    "tmh.showTranslation",
+    false
+  );
+  const [showSimilarPhrases, setShowSimilarPhrases] = usePersistedState(
+    "tmh.showSimilarPhrases",
+    false
+  );
 
   const settings: Settings = {
     theme,
@@ -72,6 +110,12 @@ export default function App() {
     showAyahNumbers,
     tajweed,
     language,
+    reciter,
+    audioOnly,
+    autoPlay,
+    volume,
+    showTranslation,
+    showSimilarPhrases,
   };
   const actions: SettingsActions = {
     setTheme,
@@ -81,6 +125,12 @@ export default function App() {
     setShowAyahNumbers,
     setTajweed,
     setLanguage,
+    setReciter,
+    setAudioOnly,
+    setAutoPlay,
+    setVolume,
+    setShowTranslation,
+    setShowSimilarPhrases,
     resetSettings: () => {
       setTheme("light");
       setFontSize(FONT_SIZE_DEFAULT);
@@ -89,6 +139,12 @@ export default function App() {
       setShowAyahNumbers(true);
       setTajweed(false);
       setLanguage("en");
+      setReciter("husary");
+      setAudioOnly(false);
+      setAutoPlay(false);
+      setVolume(100);
+      setShowTranslation(false);
+      setShowSimilarPhrases(false);
     },
   };
 
@@ -123,6 +179,20 @@ export default function App() {
   useEffect(() => {
     void loadTajweed();
   }, []);
+
+  // Pre-warm the translation file only if the user already has the
+  // "show translation" setting on. Otherwise it'd be ~290 KB gzipped
+  // of bandwidth they may never use; the file lazy-loads from the
+  // AyahTranslation component the moment they enable the toggle.
+  useEffect(() => {
+    if (showTranslation) void loadTranslation();
+  }, [showTranslation]);
+
+  // Similar-ayahs is small (~24 KB gzipped). Pre-warm when enabled,
+  // same pattern.
+  useEffect(() => {
+    if (showSimilarPhrases) void loadSimilar();
+  }, [showSimilarPhrases]);
 
   // Each screen owns its own entrance animation (animate-fade-in on the
   // root). Swap the rendered tree synchronously when `range` changes —

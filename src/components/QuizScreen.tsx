@@ -30,7 +30,17 @@ import AyahText from "./AyahText";
 import JuzCustomizer from "./JuzCustomizer";
 import KeyboardHelp from "./KeyboardHelp";
 import SurahCombobox from "./SurahCombobox";
+import VolumeOverlay from "./VolumeOverlay";
+import VolumeIcon from "./VolumeIcon";
 import AyahAudioButton from "./AyahAudioButton";
+import { takeAudioFocus, releaseAudioFocus } from "../lib/audio-focus";
+import AyahTranslation from "./AyahTranslation";
+import TranslationHint from "./TranslationHint";
+import AyahSimilarHint from "./AyahSimilarHint";
+import {
+  getReciter,
+  loadReciterSegments,
+} from "../data/reciters";
 import { juzData } from "../data/quran-meta";
 import { ensurePageFont, getTajweedRuns } from "../data/quran-tajweed";
 import { useT } from "../i18n/useT";
@@ -414,6 +424,12 @@ export default function QuizScreen({
     showAyahNumbers,
     tajweed,
     language,
+    reciter,
+    audioOnly,
+    autoPlay,
+    volume,
+    showTranslation,
+    showSimilarPhrases,
   } = settings;
   const t = useT(language);
   const [currentAyah, setCurrentAyah] = useState<AyahReference | null>(null);
@@ -434,6 +450,7 @@ export default function QuizScreen({
   const [showRangePicker, setShowRangePicker] = useState(false);
   const [customizing, setCustomizing] = useState<number[] | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [showVolume, setShowVolume] = useState(false);
   const [promptOnly, setPromptOnly] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
@@ -535,15 +552,129 @@ export default function QuizScreen({
     }
   };
 
+  const advanceOne = (
+    ref: AyahReference
+  ): AyahReference | null => {
+    const surahInfo = surahs[ref.surah - 1];
+    if (ref.ayah < surahInfo.ayahCount) {
+      return { surah: ref.surah, ayah: ref.ayah + 1 };
+    }
+    if (ref.surah < 114) {
+      return { surah: ref.surah + 1, ayah: 1 };
+    }
+    return null;
+  };
+
+  // Progressive on-demand hints. Each counter represents how many "doses"
+  // of that hint the user has unlocked for the NEXT ayah (the one
+  // they're trying to recite from memory). All reset on every roll and
+  // on every reveal — the "next ayah" pointer shifts after a reveal, so
+  // the hint cycle restarts for the new target.
+  //   firstWord — how many leading words to show
+  //   audio     — step count; each step plays 1.5s longer
+  //   translation — how many word-chunks to show (8 words per chunk)
+  const HINT_AUDIO_STEP_MS = 1500;
+  const HINT_TRANSLATION_WORDS_PER_STEP = 8;
+  const [hintFirstWordCount, setHintFirstWordCount] = useState(0);
+  const [hintAudioStep, setHintAudioStep] = useState(0);
+  const [hintTranslationStep, setHintTranslationStep] = useState(0);
+  const [hintMenuOpen, setHintMenuOpen] = useState(false);
+
+  const resetHints = () => {
+    setHintFirstWordCount(0);
+    setHintAudioStep(0);
+    setHintTranslationStep(0);
+    setHintMenuOpen(false);
+  };
+  const snippetAudioRef = useRef<HTMLAudioElement | null>(null);
+  const snippetHolderRef = useRef<{ stop: () => void }>({
+    stop: () => {
+      const a = snippetAudioRef.current;
+      if (a && !a.paused) a.pause();
+    },
+  });
+
+  /**
+   * Audio-hint snippet of the *next* ayah (the verse the user is trying
+   * to recite). Duration grows on each press (step * HINT_AUDIO_STEP_MS),
+   * up to the ayah's natural end. Surah-mode reciters seek into their
+   * whole-surah file and pause at toMs (or duration cap, whichever
+   * comes first). Coordinated with the main AyahAudioButton via the
+   * shared audio-focus holder so the two can't overlap.
+   */
+  const playAudioHint = async (step: number) => {
+    if (!hintTarget) return;
+    const info = getReciter(reciter);
+    const url = info.audioUrl(hintTarget.surah, hintTarget.ayah);
+    let fromMs = 0;
+    let toMs = Infinity;
+    if (info.mode === "surah") {
+      const segs = await loadReciterSegments(reciter);
+      const seg = segs[`${hintTarget.surah}:${hintTarget.ayah}`];
+      if (seg) {
+        fromMs = seg[0];
+        toMs = seg[1];
+      }
+    }
+    // Replace any previous snippet element.
+    const prev = snippetAudioRef.current;
+    if (prev) {
+      prev.pause();
+      prev.src = "";
+    }
+    const a = new Audio(url);
+    a.preload = "auto";
+    a.volume = Math.max(0, Math.min(1, volume / 100));
+    snippetAudioRef.current = a;
+    const requestedMs = step * HINT_AUDIO_STEP_MS;
+    const stopAtMs = Math.min(fromMs + requestedMs, toMs);
+    const stopAt = stopAtMs / 1000;
+    a.addEventListener("loadedmetadata", () => {
+      a.currentTime = fromMs / 1000;
+    });
+    a.addEventListener("timeupdate", () => {
+      if (a.currentTime >= stopAt) {
+        a.pause();
+        releaseAudioFocus(snippetHolderRef.current);
+      }
+    });
+    a.addEventListener("ended", () =>
+      releaseAudioFocus(snippetHolderRef.current)
+    );
+    takeAudioFocus(snippetHolderRef.current);
+    a.play().catch(() => releaseAudioFocus(snippetHolderRef.current));
+  };
+
+  // Stop any in-flight snippet when the ayah changes.
+  useEffect(() => {
+    return () => {
+      const a = snippetAudioRef.current;
+      if (a) {
+        a.pause();
+        a.src = "";
+        snippetAudioRef.current = null;
+      }
+    };
+  }, [currentAyah]);
+
   const rollNewAyah = useCallback(() => {
     if (ayahPool.length === 0) return;
     setLoading(true);
     setRevealedAyahs([]);
     const picked = pickWeightedRandomAyah(ayahPool);
     warmFontsFor(picked);
+    // Pre-warm the next-ayah's QPC v4 font too. That's the hint target
+    // before any reveal happens; starting the fetch *now* (instead of
+    // in a post-render useEffect) gives the woff2 the longest possible
+    // head-start. By the time the user looks at the prompt and clicks
+    // Hint, the font has usually landed and the first click renders a
+    // word immediately rather than a spinner.
+    const nextForHint = advanceOne(picked);
+    if (nextForHint) warmFontsFor(nextForHint);
     setCurrentAyah(picked);
     lastRevealedRef.current = picked;
     setPromptOnly(testFirstAyahs && picked.ayah === 1);
+    resetHints();
     setLoading(false);
   }, [ayahPool, testFirstAyahs]);
 
@@ -579,19 +710,6 @@ export default function QuizScreen({
     return () => window.removeEventListener("resize", updateWheel);
   }, [updateWheel]);
 
-  const advanceOne = (
-    ref: AyahReference
-  ): AyahReference | null => {
-    const surahInfo = surahs[ref.surah - 1];
-    if (ref.ayah < surahInfo.ayahCount) {
-      return { surah: ref.surah, ayah: ref.ayah + 1 };
-    }
-    if (ref.surah < 114) {
-      return { surah: ref.surah + 1, ayah: 1 };
-    }
-    return null;
-  };
-
   const revealNext = () => {
     if (!currentAyah || !lastRevealedRef.current) return;
 
@@ -605,12 +723,21 @@ export default function QuizScreen({
           { surah: currentAyah.surah, ayah: 1, isEndOfSurah: true },
         ]);
       }
+      // Reveal moves the next-ayah pointer, so the hint card now
+      // belongs to a different target. Tear it down — the user can
+      // request a fresh hint if they want one for the new ayah.
+      resetHints();
       return;
     }
 
     const nextRef = advanceOne(lastRevealedRef.current);
     if (!nextRef) return;
     warmFontsFor(nextRef);
+    // Look one further ahead — that becomes the new hint target the
+    // moment this reveal applies. Same eager-warm rationale as
+    // rollNewAyah.
+    const afterNext = advanceOne(nextRef);
+    if (afterNext) warmFontsFor(afterNext);
     const nextSurahInfo = surahs[nextRef.surah - 1];
     lastRevealedRef.current = nextRef;
     setRevealedAyahs((prev) => [
@@ -621,48 +748,24 @@ export default function QuizScreen({
         isEndOfSurah: nextRef.ayah === nextSurahInfo.ayahCount,
       },
     ]);
-  };
-
-  const revealRemainingPage = () => {
-    if (!currentAyah || !lastRevealedRef.current) return;
-
-    if (promptOnly) {
-      revealNext();
-      return;
-    }
-
-    const newRevealed: RevealedAyah[] = [];
-    let cursor: AyahReference | null = lastRevealedRef.current;
-    for (let i = 0; i < 10; i++) {
-      const nextRef = advanceOne(cursor);
-      if (!nextRef) break;
-      warmFontsFor(nextRef);
-      const surahInfo = surahs[nextRef.surah - 1];
-      newRevealed.push({
-        surah: nextRef.surah,
-        ayah: nextRef.ayah,
-        isEndOfSurah: nextRef.ayah === surahInfo.ayahCount,
-      });
-      cursor = nextRef;
-    }
-
-    if (cursor) lastRevealedRef.current = cursor;
-    setRevealedAyahs((prev) => [...prev, ...newRevealed]);
+    resetHints();
   };
 
   // Whether any modal/overlay owns the keyboard right now. While one is
   // open, only "Escape" (handled by the overlays themselves) should fire.
   const anyOverlayOpen =
-    showSettings || showRangePicker || customizing !== null || showHelp;
+    showSettings ||
+    showRangePicker ||
+    customizing !== null ||
+    showHelp ||
+    showVolume;
 
   useKeyboard(
     {
-      // Reveal next ayah on Space or right/down arrow. Shift+Space jumps 10.
+      // Reveal next ayah on Space or right/down arrow.
       " ": (e) => {
         e.preventDefault();
-        if (atRangeEnd) return;
-        if (e.shiftKey) revealRemainingPage();
-        else revealNext();
+        if (!atRangeEnd) revealNext();
       },
       ArrowRight: (e) => {
         e.preventDefault();
@@ -673,8 +776,9 @@ export default function QuizScreen({
         if (!atRangeEnd) revealNext();
       },
       Enter: () => {
-        if (!atRangeEnd) revealRemainingPage();
+        if (!atRangeEnd) revealNext();
       },
+      h: () => setHintMenuOpen((v) => !v),
       n: () => rollNewAyah(),
       r: () => rollNewAyah(),
       Escape: () => onBack(),
@@ -696,6 +800,7 @@ export default function QuizScreen({
       Escape: () => {
         if (showHelp) setShowHelp(false);
         else if (customizing !== null) setCustomizing(null);
+        else if (showVolume) setShowVolume(false);
         else if (showRangePicker) setShowRangePicker(false);
         else if (showSettings) setShowSettings(false);
       },
@@ -768,6 +873,59 @@ export default function QuizScreen({
     !promptOnly &&
     lastShown.surah === rangeBounds.endSurah &&
     lastShown.ayah === rangeBounds.endAyah;
+
+  /**
+   * The ayah that hints target: the verse the user is *currently
+   * trying to recite from memory*. That's:
+   *   - In promptOnly mode (test first ayahs): the rolled ayah itself,
+   *     whose text is hidden behind the surah-name prompt.
+   *   - Otherwise: the ayah immediately following the last shown one.
+   * Null if there's nothing to recite next (atRangeEnd, no current
+   * ayah, etc.) — in which case the hint menu is disabled.
+   */
+  const hintTarget: AyahReference | null = (() => {
+    if (!currentAyah) return null;
+    if (promptOnly) return currentAyah;
+    if (atRangeEnd) return null;
+    if (!lastShown) return null;
+    return advanceOne(lastShown);
+  })();
+
+  // Page numbers the hint target lives on (1-3 entries; usually 1).
+  // Pre-warmed inline in rollNewAyah/revealNext; this effect is a
+  // safety net for cases where hintTarget changes from outside those
+  // paths.
+  const hintTargetPages: number[] = hintTarget
+    ? Array.from(
+        new Set(
+          getTajweedRuns(hintTarget.surah, hintTarget.ayah).map((r) => r.p)
+        )
+      )
+    : [];
+  const hintTargetPagesKey = hintTargetPages.join(",");
+  /* eslint-disable react-hooks/exhaustive-deps */
+  useEffect(() => {
+    for (const p of hintTargetPages) ensurePageFont(p);
+  }, [hintTargetPagesKey]);
+  /* eslint-enable react-hooks/exhaustive-deps */
+
+  /**
+   * Ensures the QPC v4 font for the hint target's page(s) has actually
+   * finished loading before resolving. The click handler awaits this
+   * before incrementing the first-word counter so the box only opens
+   * once the AyahText can render visibly. Without this, font-display:
+   * block leaves the first click rendering an invisible block and the
+   * user clicks again to "fix" it.
+   */
+  const ensureHintFontsReady = async () => {
+    if (typeof document === "undefined" || !("fonts" in document)) return;
+    if (hintTargetPages.length === 0) return;
+    await Promise.all(
+      hintTargetPages.map((p) =>
+        document.fonts.load(`16px "qpc-v4-p${p}"`).catch(() => undefined)
+      )
+    );
+  };
 
   // Screen-reader-only announcement that flips with each new prompt or
   // when the user reaches the end of the range. Uses surah names + ayah
@@ -844,6 +1002,13 @@ export default function QuizScreen({
         language={language}
         context="quiz"
       />
+      <VolumeOverlay
+        open={showVolume}
+        onClose={() => setShowVolume(false)}
+        value={volume}
+        onChange={actions.setVolume}
+        language={language}
+      />
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {liveAnnouncement}
       </div>
@@ -895,6 +1060,23 @@ export default function QuizScreen({
                   d="M19 9l-7 7-7-7"
                 />
               </svg>
+            </button>
+            <button
+              onClick={() => {
+                setShowVolume((v) => !v);
+                if (!showVolume) {
+                  setShowSettings(false);
+                  setShowRangePicker(false);
+                }
+              }}
+              className={`p-2 rounded-full border transition-all duration-200 ${
+                showVolume
+                  ? "bg-neutral-900 dark:bg-neutral-100 border-neutral-900 dark:border-neutral-100 text-white dark:text-neutral-900"
+                  : "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:border-neutral-300"
+              }`}
+              aria-label={t("volume")}
+            >
+              <VolumeIcon level={volume} />
             </button>
             <button
               onClick={() => {
@@ -979,7 +1161,7 @@ export default function QuizScreen({
                           data-wheel-card
                           className="wheel-card bg-white dark:bg-neutral-900 rounded-3xl border-2 border-neutral-900/10 dark:border-neutral-100/15 p-7 ring-1 ring-neutral-900/5 dark:ring-neutral-100/10"
                         >
-                          {!promptOnly && (
+                          {!promptOnly && !audioOnly && (
                             <div className="text-center mb-4 flex items-center justify-center gap-2">
                               {!hideSurahName && (
                                 <span className="text-xs font-medium text-neutral-700 dark:text-neutral-200 bg-neutral-100 dark:bg-neutral-800 px-3 py-1 rounded-full">
@@ -996,12 +1178,42 @@ export default function QuizScreen({
                                 key={`${currentAyah.surah}:${currentAyah.ayah}`}
                                 surah={currentAyah.surah}
                                 ayah={currentAyah.ayah}
+                                reciter={reciter}
+                                autoPlay={autoPlay}
+                                volume={volume}
                                 ariaLabel={t("playAyah")}
                               />
                             </div>
                           )}
 
-                          {promptOnly ? (
+                          {audioOnly ? (
+                            <div className="flex flex-col items-center gap-4 py-6">
+                              {!hideSurahName && (
+                                <div className="text-xs font-medium text-neutral-700 dark:text-neutral-200 bg-neutral-100 dark:bg-neutral-800 px-3 py-1 rounded-full">
+                                  {currentSurahInfo!.nameArabic} —{" "}
+                                  {currentSurahInfo!.name} : {currentAyah.ayah}
+                                </div>
+                              )}
+                              <AyahAudioButton
+                                key={`${currentAyah.surah}:${currentAyah.ayah}`}
+                                surah={currentAyah.surah}
+                                ayah={currentAyah.ayah}
+                                reciter={reciter}
+                                size="lg"
+                                autoPlay={autoPlay}
+                                volume={volume}
+                                ariaLabel={t("playAyah")}
+                              />
+                              <div className="text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
+                                {t("listenAndRecite")}
+                              </div>
+                              {isLastAyah && (
+                                <span className="text-xs font-medium text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 px-3 py-1 rounded-full border border-rose-100 dark:border-rose-900/60">
+                                  {t("lastAyah")}
+                                </span>
+                              )}
+                            </div>
+                          ) : promptOnly ? (
                             <div className="text-center py-6">
                               <div className="text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-3">
                                 {t("whatsFirstAyahOf")}
@@ -1014,14 +1226,29 @@ export default function QuizScreen({
                               </div>
                             </div>
                           ) : (
-                            <AyahText
-                              surah={currentAyah.surah}
-                              ayah={currentAyah.ayah}
-                              showMarker={showAyahNumbers}
-                              tajweed={tajweed}
-                              className="font-quran leading-[2.4] text-neutral-800 dark:text-neutral-200 text-right"
-                              style={ayahStyle}
-                            />
+                            <>
+                              <AyahText
+                                surah={currentAyah.surah}
+                                ayah={currentAyah.ayah}
+                                showMarker={showAyahNumbers}
+                                tajweed={tajweed}
+                                className="font-quran leading-[2.4] text-neutral-800 dark:text-neutral-200 text-right"
+                                style={ayahStyle}
+                              />
+                              {showTranslation && (
+                                <AyahTranslation
+                                  surah={currentAyah.surah}
+                                  ayah={currentAyah.ayah}
+                                />
+                              )}
+                              {showSimilarPhrases && (
+                                <AyahSimilarHint
+                                  surah={currentAyah.surah}
+                                  ayah={currentAyah.ayah}
+                                  language={language}
+                                />
+                              )}
+                            </>
                           )}
                         </div>
                       </>
@@ -1070,6 +1297,9 @@ export default function QuizScreen({
                           <AyahAudioButton
                             surah={ra.surah}
                             ayah={ra.ayah}
+                            reciter={reciter}
+                            autoPlay={autoPlay && i === revealedAyahs.length - 1}
+                            volume={volume}
                             ariaLabel={t("playAyah")}
                           />
                         </div>
@@ -1081,10 +1311,67 @@ export default function QuizScreen({
                           className="font-quran leading-[2.2] text-neutral-800 dark:text-neutral-200 text-right"
                           style={ayahStyle}
                         />
+                        {showTranslation && (
+                          <AyahTranslation
+                            surah={ra.surah}
+                            ayah={ra.ayah}
+                          />
+                        )}
+                        {showSimilarPhrases && (
+                          <AyahSimilarHint
+                            surah={ra.surah}
+                            ayah={ra.ayah}
+                            language={language}
+                          />
+                        )}
                       </div>
                     </Fragment>
                   );
                 })}
+
+                {/* Hint card — content describes the NEXT ayah the user
+                    is trying to recite. Each hint type grows on
+                    repeated presses (more words / longer audio / more
+                    translation). Hidden until at least one hint has
+                    been requested. Placed at the tail of the reveal
+                    stream so it sits where the user's eyes are. */}
+                {hintTarget &&
+                  (hintFirstWordCount > 0 || hintTranslationStep > 0) && (
+                    <div className="bg-amber-50/60 dark:bg-amber-950/20 rounded-3xl border border-amber-200/60 dark:border-amber-900/40 p-5 animate-fade-in-soft">
+                      <div className="text-[10px] uppercase tracking-widest text-amber-700 dark:text-amber-300 mb-3 flex items-center gap-1.5">
+                        <svg
+                          className="w-3 h-3"
+                          fill="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path d="M12 2C8.13 2 5 5.13 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.87-3.13-7-7-7zM9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1z" />
+                        </svg>
+                        {t("hint")}
+                      </div>
+                      {hintFirstWordCount > 0 && (
+                        <AyahText
+                          surah={hintTarget.surah}
+                          ayah={hintTarget.ayah}
+                          showMarker={false}
+                          tajweed={tajweed}
+                          wordLimit={hintFirstWordCount}
+                          className="font-quran leading-[2.4] text-neutral-800 dark:text-neutral-200 text-right"
+                          style={ayahStyle}
+                        />
+                      )}
+                      {hintTranslationStep > 0 && (
+                        <TranslationHint
+                          surah={hintTarget.surah}
+                          ayah={hintTarget.ayah}
+                          step={hintTranslationStep}
+                          wordsPerStep={HINT_TRANSLATION_WORDS_PER_STEP}
+                          className={
+                            hintFirstWordCount > 0 ? "mt-3" : ""
+                          }
+                        />
+                      )}
+                    </div>
+                  )}
 
                 {atRangeEnd && (
                   <div className="text-center text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 pt-2 pb-4 animate-fade-in-soft">
@@ -1094,30 +1381,91 @@ export default function QuizScreen({
               </div>
             </div>
 
-            <div className="shrink-0 pt-3">
-            <div className="flex gap-3 mb-3">
-              <button
-                onClick={revealNext}
-                disabled={atRangeEnd}
-                className="flex-1 py-3 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 font-medium rounded-xl border border-neutral-200 dark:border-neutral-800 transition-all duration-200 active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none"
-              >
-                {promptOnly ? t("revealFirstAyah") : t("revealNextAyah")}
-              </button>
-              <button
-                onClick={revealRemainingPage}
-                disabled={atRangeEnd}
-                className="flex-1 py-3 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 font-medium rounded-xl border border-neutral-200 dark:border-neutral-800 transition-all duration-200 active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none"
-              >
-                {t("revealMore")}
-              </button>
-            </div>
+            <div className="shrink-0 pt-3 relative">
+              {hintMenuOpen && hintTarget && (
+                <div
+                  className="absolute bottom-full inset-x-0 mb-2 grid grid-cols-3 gap-2 bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-xl shadow-neutral-900/10 dark:shadow-neutral-950/40 p-2 animate-fade-in-soft z-30"
+                  role="menu"
+                >
+                  <button
+                    role="menuitem"
+                    onClick={async () => {
+                      // Close the menu immediately for snappy feedback,
+                      // but defer the count increment until the QPC v4
+                      // font for the hint target has actually loaded.
+                      // Otherwise the AyahText would render invisibly
+                      // (font-display: block) and the user would feel
+                      // the click "did nothing" until they clicked
+                      // again. In practice this await resolves
+                      // synchronously once the font has been pre-warmed
+                      // by rollNewAyah/revealNext.
+                      setHintMenuOpen(false);
+                      await ensureHintFontsReady();
+                      setHintFirstWordCount((c) => c + 1);
+                    }}
+                    className="py-2 px-2 text-xs font-medium text-neutral-700 dark:text-neutral-200 bg-neutral-50 dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg transition-colors"
+                  >
+                    {hintFirstWordCount === 0
+                      ? t("hintFirstWord")
+                      : `${t("hintFirstWord")} +`}
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => {
+                      const next = hintAudioStep + 1;
+                      setHintAudioStep(next);
+                      void playAudioHint(next);
+                      setHintMenuOpen(false);
+                    }}
+                    className="py-2 px-2 text-xs font-medium text-neutral-700 dark:text-neutral-200 bg-neutral-50 dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg transition-colors"
+                  >
+                    {hintAudioStep === 0
+                      ? t("hintAudio")
+                      : `${t("hintAudio")} +`}
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => {
+                      setHintTranslationStep((s) => s + 1);
+                      setHintMenuOpen(false);
+                    }}
+                    className="py-2 px-2 text-xs font-medium text-neutral-700 dark:text-neutral-200 bg-neutral-50 dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg transition-colors"
+                  >
+                    {hintTranslationStep === 0
+                      ? t("hintTranslation")
+                      : `${t("hintTranslation")} +`}
+                  </button>
+                </div>
+              )}
+              <div className="flex gap-3 mb-3">
+                <button
+                  onClick={() => setHintMenuOpen((v) => !v)}
+                  disabled={!hintTarget}
+                  className={`flex-1 py-3 font-medium rounded-xl border transition-all duration-200 active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none ${
+                    hintMenuOpen
+                      ? "bg-neutral-900 dark:bg-neutral-100 border-neutral-900 dark:border-neutral-100 text-white dark:text-neutral-900"
+                      : "bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 border-neutral-200 dark:border-neutral-800"
+                  }`}
+                  aria-haspopup="menu"
+                  aria-expanded={hintMenuOpen}
+                >
+                  {t("hint")}
+                </button>
+                <button
+                  onClick={revealNext}
+                  disabled={atRangeEnd}
+                  className="flex-1 py-3 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 font-medium rounded-xl border border-neutral-200 dark:border-neutral-800 transition-all duration-200 active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none"
+                >
+                  {promptOnly ? t("revealFirstAyah") : t("revealNextAyah")}
+                </button>
+              </div>
 
-            <button
-              onClick={rollNewAyah}
-              className="w-full py-3.5 bg-neutral-900 dark:bg-neutral-100 hover:bg-neutral-800 dark:hover:bg-neutral-200 text-white dark:text-neutral-900 font-medium rounded-xl transition-all duration-200 active:scale-[0.99]"
-            >
-              {t("nextRandomAyah")}
-            </button>
+              <button
+                onClick={rollNewAyah}
+                className="w-full py-3.5 bg-neutral-900 dark:bg-neutral-100 hover:bg-neutral-800 dark:hover:bg-neutral-200 text-white dark:text-neutral-900 font-medium rounded-xl transition-all duration-200 active:scale-[0.99]"
+              >
+                {t("nextRandomAyah")}
+              </button>
             </div>
           </div>
         )}

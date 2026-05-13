@@ -34,10 +34,10 @@ export default function KeyboardHelp({
 
   const quizRows: Row[] = [
     { keys: ["Space"], description: "Reveal next ayah" },
-    { keys: ["Shift", "Space"], description: "Reveal next 10 ayahs" },
-    { keys: ["Enter"], description: "Reveal next 10 ayahs" },
+    { keys: ["Enter"], description: "Reveal next ayah" },
     { keys: ["→"], description: "Reveal next ayah" },
     { keys: ["↓"], description: "Reveal next ayah" },
+    { keys: ["H"], description: "Open hint menu" },
     { keys: ["N"], description: "Next random ayah" },
     { keys: ["R"], description: "Next random ayah" },
     { keys: ["Esc"], description: "Back / close overlay" },

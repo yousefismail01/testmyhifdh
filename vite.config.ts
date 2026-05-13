@@ -63,19 +63,50 @@ export default defineConfig({
             },
           },
           {
-            // Husary recitations from Tarteel's CDN — cache-first so once
+            // Recitations from Tarteel's CDN — cache-first so once
             // you've heard an ayah it plays instantly the next time and
-            // works offline.
-            urlPattern: /^https:\/\/audio-cdn\.tarteel\.ai\/quran\/husary\/.*\.mp3$/,
+            // works offline. Pattern matches both the ayah-mode reciters
+            // (/quran/{slug}/NNNMMM.mp3) and the surah-mode reciters
+            // (/quran/surah/{slug}/...mp3).
+            urlPattern: /^https:\/\/audio-cdn\.tarteel\.ai\/quran\/.*\.mp3$/,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'ayah-audio-husary',
+              cacheName: 'tarteel-audio',
               expiration: {
-                maxEntries: 500,
+                maxEntries: 1000,
                 maxAgeSeconds: 60 * 60 * 24 * 90, // 90 days
               },
               cacheableResponse: { statuses: [0, 200] },
               rangeRequests: true,
+            },
+          },
+          {
+            // Per-reciter segment-timing JSON for surah-mode recitations.
+            urlPattern: /\/data\/segments-.*\.json$/,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'reciter-segments',
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            // Translation table (~286 KB gzipped). Stale-while-revalidate
+            // so a returning user gets the cached copy instantly.
+            urlPattern: /\/data\/translation-.*\.json$/,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'translations',
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            // Similar-ayahs (mutashabihat) lookup table — small enough
+            // that stale-while-revalidate is fine.
+            urlPattern: /\/data\/similar-ayahs\.json$/,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'similar-ayahs',
+              cacheableResponse: { statuses: [0, 200] },
             },
           },
         ],

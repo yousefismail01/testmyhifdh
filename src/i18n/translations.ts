@@ -35,7 +35,10 @@ const en = {
 
   revealFirstAyah: "Reveal First Ayah",
   revealNextAyah: "Reveal Next Ayah",
-  revealMore: "Reveal More (+10)",
+  hint: "Hint",
+  hintFirstWord: "First word",
+  hintAudio: "Play audio",
+  hintTranslation: "Translation",
   nextRandomAyah: "Next Random Ayah",
   whatsFirstAyahOf: "What's the first ayah of",
   lastAyah: "Last ayah",
@@ -69,6 +72,20 @@ const en = {
   searchSurahPlaceholder: "Search by name or number",
   noResults: "No matches",
   playAyah: "Play ayah recitation",
+  reciter: "Reciter",
+  audio: "Audio",
+  volume: "Volume",
+  audioOnly: "Audio only",
+  audioOnlyDesc: "Hide the prompt's text — listen to recite",
+  autoPlay: "Auto-play audio",
+  autoPlayDesc: "Start playing the rolled ayah automatically",
+  showTranslation: "Show translation",
+  showTranslationDesc: "Display the English meaning beneath each ayah",
+  showSimilarPhrases: "Show similar verses",
+  showSimilarPhrasesDesc:
+    "Flag ayahs whose wording matches the Mutashabihat — common hifz pitfalls",
+  similarPhrases: "Also",
+  listenAndRecite: "Listen and recite",
 };
 
 const ar: typeof en = {
@@ -106,7 +123,10 @@ const ar: typeof en = {
 
   revealFirstAyah: "اكشف الآية الأولى",
   revealNextAyah: "اكشف الآية التالية",
-  revealMore: "اكشف المزيد (١٠+)",
+  hint: "تلميح",
+  hintFirstWord: "أول كلمة",
+  hintAudio: "تشغيل الصوت",
+  hintTranslation: "الترجمة",
   nextRandomAyah: "آية عشوائية تالية",
   whatsFirstAyahOf: "ما الآية الأولى من سورة",
   lastAyah: "آخر آية",
@@ -140,6 +160,20 @@ const ar: typeof en = {
   searchSurahPlaceholder: "ابحث بالاسم أو الرقم",
   noResults: "لا توجد نتائج",
   playAyah: "تشغيل تلاوة الآية",
+  reciter: "القارئ",
+  audio: "الصوت",
+  volume: "مستوى الصوت",
+  audioOnly: "الصوت فقط",
+  audioOnlyDesc: "إخفاء نص الآية — استمع لتُلاوة الآية",
+  autoPlay: "تشغيل تلقائي",
+  autoPlayDesc: "تشغيل الآية تلقائيًا عند ظهورها",
+  showTranslation: "إظهار الترجمة",
+  showTranslationDesc: "عرض المعنى الإنجليزي تحت كل آية",
+  showSimilarPhrases: "إظهار الآيات المتشابهة",
+  showSimilarPhrasesDesc:
+    "تنبيه إلى الآيات ذات الألفاظ المتشابهة — مواضع الالتباس في الحفظ",
+  similarPhrases: "أيضًا",
+  listenAndRecite: "استمع واتلُ",
 };
 
 const ur: typeof en = {
@@ -177,7 +211,10 @@ const ur: typeof en = {
 
   revealFirstAyah: "پہلی آیت دکھائیں",
   revealNextAyah: "اگلی آیت دکھائیں",
-  revealMore: "مزید دکھائیں (+۱۰)",
+  hint: "ہنٹ",
+  hintFirstWord: "پہلا لفظ",
+  hintAudio: "آڈیو چلائیں",
+  hintTranslation: "ترجمہ",
   nextRandomAyah: "اگلی بے ترتیب آیت",
   whatsFirstAyahOf: "اس سورت کی پہلی آیت کیا ہے",
   lastAyah: "آخری آیت",
@@ -211,6 +248,20 @@ const ur: typeof en = {
   searchSurahPlaceholder: "نام یا نمبر سے تلاش کریں",
   noResults: "کوئی نتیجہ نہیں",
   playAyah: "آیت کی تلاوت چلائیں",
+  reciter: "قاری",
+  audio: "آڈیو",
+  volume: "آواز",
+  audioOnly: "صرف آڈیو",
+  audioOnlyDesc: "آیت کا متن چھپائیں — سن کر تلاوت کریں",
+  autoPlay: "خودکار چلائیں",
+  autoPlayDesc: "آیت آنے پر خود بخود تلاوت چلائیں",
+  showTranslation: "ترجمہ دکھائیں",
+  showTranslationDesc: "ہر آیت کے نیچے انگریزی ترجمہ دکھائیں",
+  showSimilarPhrases: "مشابہ آیات دکھائیں",
+  showSimilarPhrasesDesc:
+    "ان آیات کی نشان دہی جن کے الفاظ متشابہ ہیں — حفظ میں عام دھوکے کے مقامات",
+  similarPhrases: "نیز",
+  listenAndRecite: "سنیں اور تلاوت کریں",
 };
 
 export const translations: Record<Language, typeof en> = { en, ar, ur };

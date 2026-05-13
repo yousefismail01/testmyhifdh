@@ -14,6 +14,19 @@ let loadingPromise: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 
 const loadedFonts = new Set<number>();
+const readyFonts = new Set<number>();
+const fontReadyListeners = new Set<() => void>();
+
+/** True once the page's woff2 has finished loading into the document. */
+export function isPageFontReady(page: number): boolean {
+  return readyFonts.has(page);
+}
+
+/** Subscribe to font-ready notifications (any page becoming ready). */
+export function subscribePageFontReady(listener: () => void): () => void {
+  fontReadyListeners.add(listener);
+  return () => fontReadyListeners.delete(listener);
+}
 
 /**
  * Kicks off a fetch of /data/ayahs-tajweed.json the first time it's
@@ -84,9 +97,22 @@ export function ensurePageFont(page: number): void {
       { display: "block" }
     );
     document.fonts.add(face);
-    void face.load();
+    face
+      .load()
+      .then(() => {
+        readyFonts.add(page);
+        for (const l of fontReadyListeners) l();
+      })
+      .catch(() => {
+        // Network/decoding failure — still mark "ready" so callers
+        // stop waiting forever; the fallback glyphs will at least show
+        // something.
+        readyFonts.add(page);
+        for (const l of fontReadyListeners) l();
+      });
   } catch {
     /* fontface unsupported — degrade gracefully */
+    readyFonts.add(page);
   }
   // The QPC v4 font ships 6 CPAL palettes. We reference three named:
   //   palette 0 (default)      — black base text + tajweed colors  (tajweed, light)

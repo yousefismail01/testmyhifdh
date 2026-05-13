@@ -5,6 +5,8 @@ import SettingsOverlay from "./SettingsOverlay";
 import JuzCustomizer from "./JuzCustomizer";
 import KeyboardHelp from "./KeyboardHelp";
 import SurahCombobox from "./SurahCombobox";
+import VolumeOverlay from "./VolumeOverlay";
+import VolumeIcon from "./VolumeIcon";
 import { useT } from "../i18n/useT";
 import { useDragSelect } from "../hooks/useDragSelect";
 import { useKeyboard } from "../hooks/useKeyboard";
@@ -59,6 +61,7 @@ export default function RangeSelector({
   const [showSettings, setShowSettings] = useState(false);
   const [customizing, setCustomizing] = useState<number[] | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [showVolume, setShowVolume] = useState(false);
   // Anchor for two-tap range fill on the juz grid. First tap on an
   // unselected juz sets the anchor and adds that juz; a second tap on
   // another unselected juz unions every juz between the anchor and the
@@ -209,6 +212,14 @@ export default function RangeSelector({
         language={settings.language}
         context="home"
       />
+      <VolumeOverlay
+        open={showVolume}
+        onClose={() => setShowVolume(false)}
+        value={settings.volume}
+        onChange={actions.setVolume}
+        language={settings.language}
+        containerWidth="max-w-lg"
+      />
       <div
         className="absolute z-50 inset-x-0 px-4 flex justify-center pointer-events-none"
         style={{ top: "max(1rem, env(safe-area-inset-top))" }}
@@ -249,6 +260,17 @@ export default function RangeSelector({
                 <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" />
               </svg>
             )}
+          </button>
+          <button
+            onClick={() => setShowVolume((v) => !v)}
+            className={`p-2 rounded-full border transition-all duration-200 ${
+              showVolume
+                ? "bg-neutral-900 dark:bg-neutral-100 border-neutral-900 dark:border-neutral-100 text-white dark:text-neutral-900"
+                : "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:border-neutral-300"
+            }`}
+            aria-label={t("volume")}
+          >
+            <VolumeIcon level={settings.volume} />
           </button>
           <button
             onClick={() => setShowSettings((v) => !v)}
