@@ -31,6 +31,7 @@ const en = {
   endOfRange: "End of range",
 
   settings: "Settings",
+  preferences: "Preferences",
   changeRange: "Change range",
   switchToLight: "Switch to light mode",
   switchToDark: "Switch to dark mode",
@@ -85,6 +86,7 @@ const ar: typeof en = {
   endOfRange: "نهاية المدى",
 
   settings: "الإعدادات",
+  preferences: "التفضيلات",
   changeRange: "تغيير المدى",
   switchToLight: "التبديل إلى الوضع الفاتح",
   switchToDark: "التبديل إلى الوضع الداكن",
@@ -139,6 +141,7 @@ const ur: typeof en = {
   endOfRange: "حد کا اختتام",
 
   settings: "ترتیبات",
+  preferences: "ترجیحات",
   changeRange: "حد تبدیل کریں",
   switchToLight: "ہلکے وضع پر بدلیں",
   switchToDark: "گہرے وضع پر بدلیں",

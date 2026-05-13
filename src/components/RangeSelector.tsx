@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { surahs, juzData } from "../data/quran-meta";
 import type { Settings, SettingsActions } from "../App";
-import SettingsPanel from "./SettingsPanel";
+import SettingsOverlay from "./SettingsOverlay";
 import { useT } from "../i18n/useT";
 
 export type RangeMode = "surah" | "juz" | "page";
@@ -75,12 +75,18 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
 
   return (
     <div
-      className="min-h-screen bg-white dark:bg-neutral-950 flex items-center justify-center p-4 animate-fade-in"
+      className="relative min-h-screen bg-white dark:bg-neutral-950 flex items-center justify-center p-4 animate-fade-in"
       style={{
         paddingTop: "max(1rem, env(safe-area-inset-top))",
         paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
       }}
     >
+      <SettingsOverlay
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        settings={settings}
+        actions={actions}
+      />
       <div className="w-full max-w-lg">
         <div className="flex justify-end gap-2 mb-4">
           <button
@@ -150,11 +156,6 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
           </button>
         </div>
 
-        {showSettings && (
-          <div className="mb-6">
-            <SettingsPanel settings={settings} actions={actions} />
-          </div>
-        )}
 
         <div className="text-center mb-12 animate-slide-up">
           <h1 className="text-4xl font-medium text-neutral-900 dark:text-neutral-100 tracking-tight">

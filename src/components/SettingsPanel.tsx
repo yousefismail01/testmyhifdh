@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Settings, SettingsActions, Theme } from "../App";
 import { FONT_SIZE_MAX, FONT_SIZE_MIN } from "../App";
 import { LANGUAGE_NAMES } from "../i18n/translations";
@@ -7,82 +8,135 @@ import { useT } from "../i18n/useT";
 interface Props {
   settings: Settings;
   actions: SettingsActions;
-  /** When true, hides quiz-specific toggles. */
-  compact?: boolean;
 }
 
-export default function SettingsPanel({ settings, actions, compact }: Props) {
+/** Settings panel with two views:
+ *  - main: per-quiz toggles + a "Preferences ›" entry
+ *  - preferences: text size, theme, language */
+export default function SettingsPanel({ settings, actions }: Props) {
   const t = useT(settings.language);
+  const [view, setView] = useState<"main" | "preferences">("main");
+
   return (
-    <div className="bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-5 space-y-4 animate-fade-in">
-      {!compact && (
-        <>
-          <label className="flex items-center justify-between cursor-pointer">
-            <div className="pr-4">
-              <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
-                {t("hideSurahNames")}
-              </div>
-              <div className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
-                {t("hideSurahNamesDesc")}
-              </div>
-            </div>
-            <input
-              type="checkbox"
-              checked={settings.hideSurahName}
-              onChange={(e) => actions.setHideSurahName(e.target.checked)}
-              className="w-5 h-5 accent-neutral-900 dark:accent-neutral-100 shrink-0"
-            />
-          </label>
-          <label className="flex items-center justify-between cursor-pointer">
-            <div className="pr-4">
-              <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
-                {t("testFirstAyahs")}
-              </div>
-              <div className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
-                {t("testFirstAyahsDesc")}
-              </div>
-            </div>
-            <input
-              type="checkbox"
-              checked={settings.testFirstAyahs}
-              onChange={(e) => actions.setTestFirstAyahs(e.target.checked)}
-              className="w-5 h-5 accent-neutral-900 dark:accent-neutral-100 shrink-0"
-            />
-          </label>
-          <label className="flex items-center justify-between cursor-pointer">
-            <div className="pr-4">
-              <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
-                {t("showAyahNumbers")}
-              </div>
-              <div className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
-                {t("showAyahNumbersDesc")}
-              </div>
-            </div>
-            <input
-              type="checkbox"
-              checked={settings.showAyahNumbers}
-              onChange={(e) => actions.setShowAyahNumbers(e.target.checked)}
-              className="w-5 h-5 accent-neutral-900 dark:accent-neutral-100 shrink-0"
-            />
-          </label>
-          <label className="flex items-center justify-between cursor-pointer">
-            <div className="pr-4">
-              <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
-                {t("tajweed")}
-              </div>
-              <div className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
-                {t("tajweedDesc")}
-              </div>
-            </div>
-            <input
-              type="checkbox"
-              checked={settings.tajweed}
-              onChange={(e) => actions.setTajweed(e.target.checked)}
-              className="w-5 h-5 accent-neutral-900 dark:accent-neutral-100 shrink-0"
-            />
-          </label>
-        </>
-      )}
+    <div className="bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-5 shadow-xl shadow-neutral-900/5 dark:shadow-neutral-950/40 overflow-hidden">
+      <div key={view} className="animate-fade-in-soft space-y-4">
+        {view === "main" ? (
+          <MainView
+            settings={settings}
+            actions={actions}
+            t={t}
+            onPreferences={() => setView("preferences")}
+          />
+        ) : (
+          <PreferencesView
+            settings={settings}
+            actions={actions}
+            t={t}
+            onBack={() => setView("main")}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+type T = ReturnType<typeof useT>;
+
+function MainView({
+  settings,
+  actions,
+  t,
+  onPreferences,
+}: {
+  settings: Settings;
+  actions: SettingsActions;
+  t: T;
+  onPreferences: () => void;
+}) {
+  return (
+    <>
+      <ToggleRow
+        title={t("hideSurahNames")}
+        desc={t("hideSurahNamesDesc")}
+        checked={settings.hideSurahName}
+        onChange={actions.setHideSurahName}
+      />
+      <ToggleRow
+        title={t("testFirstAyahs")}
+        desc={t("testFirstAyahsDesc")}
+        checked={settings.testFirstAyahs}
+        onChange={actions.setTestFirstAyahs}
+      />
+      <ToggleRow
+        title={t("showAyahNumbers")}
+        desc={t("showAyahNumbersDesc")}
+        checked={settings.showAyahNumbers}
+        onChange={actions.setShowAyahNumbers}
+      />
+      <ToggleRow
+        title={t("tajweed")}
+        desc={t("tajweedDesc")}
+        checked={settings.tajweed}
+        onChange={actions.setTajweed}
+      />
+
+      <button
+        onClick={onPreferences}
+        className="w-full mt-1 px-3 py-3 flex items-center justify-between rounded-2xl border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
+      >
+        <span className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
+          {t("preferences")}
+        </span>
+        <svg
+          className="w-4 h-4 text-neutral-400 dark:text-neutral-500 rtl:rotate-180"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 5l7 7-7 7"
+          />
+        </svg>
+      </button>
+    </>
+  );
+}
+
+function PreferencesView({
+  settings,
+  actions,
+  t,
+  onBack,
+}: {
+  settings: Settings;
+  actions: SettingsActions;
+  t: T;
+  onBack: () => void;
+}) {
+  return (
+    <>
+      <button
+        onClick={onBack}
+        className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors -mt-1 mb-2"
+      >
+        <svg
+          className="w-4 h-4 rtl:rotate-180"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 19l-7-7 7-7"
+          />
+        </svg>
+        {t("preferences")}
+      </button>
 
       <div className="pt-1">
         <div className="flex items-baseline justify-between mb-2">
@@ -109,46 +163,91 @@ export default function SettingsPanel({ settings, actions, compact }: Props) {
         </div>
       </div>
 
-      <div className="pt-1">
-        <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200 mb-2">
-          {t("theme")}
+      <Segmented
+        label={t("theme")}
+        value={settings.theme}
+        onChange={(v) => actions.setTheme(v as Theme)}
+        options={[
+          { value: "light", label: t("themeLight") },
+          { value: "dark", label: t("themeDark") },
+        ]}
+      />
+
+      <Segmented
+        label={t("language")}
+        value={settings.language}
+        onChange={(v) => actions.setLanguage(v as Language)}
+        options={[
+          { value: "en", label: LANGUAGE_NAMES.en },
+          { value: "ar", label: LANGUAGE_NAMES.ar },
+          { value: "ur", label: LANGUAGE_NAMES.ur },
+        ]}
+      />
+    </>
+  );
+}
+
+function ToggleRow({
+  title,
+  desc,
+  checked,
+  onChange,
+}: {
+  title: string;
+  desc: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <label className="flex items-center justify-between cursor-pointer">
+      <div className="pe-4">
+        <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
+          {title}
         </div>
-        <div className="flex gap-1 bg-neutral-50 dark:bg-neutral-800 rounded-xl p-1">
-          {(["light", "dark"] as const).map((th) => (
-            <button
-              key={th}
-              onClick={() => actions.setTheme(th as Theme)}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
-                settings.theme === th
-                  ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm"
-                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
-              }`}
-            >
-              {th === "light" ? t("themeLight") : t("themeDark")}
-            </button>
-          ))}
+        <div className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
+          {desc}
         </div>
       </div>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="w-5 h-5 accent-neutral-900 dark:accent-neutral-100 shrink-0"
+      />
+    </label>
+  );
+}
 
-      <div className="pt-1">
-        <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200 mb-2">
-          {t("language")}
-        </div>
-        <div className="flex gap-1 bg-neutral-50 dark:bg-neutral-800 rounded-xl p-1">
-          {(["en", "ar", "ur"] as const).map((lang) => (
-            <button
-              key={lang}
-              onClick={() => actions.setLanguage(lang as Language)}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
-                settings.language === lang
-                  ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm"
-                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
-              }`}
-            >
-              {LANGUAGE_NAMES[lang]}
-            </button>
-          ))}
-        </div>
+function Segmented({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <div className="pt-1">
+      <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200 mb-2">
+        {label}
+      </div>
+      <div className="flex gap-1 bg-neutral-50 dark:bg-neutral-800 rounded-xl p-1">
+        {options.map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => onChange(opt.value)}
+            className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
+              value === opt.value
+                ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm"
+                : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
       </div>
     </div>
   );

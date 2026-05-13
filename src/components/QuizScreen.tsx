@@ -16,7 +16,7 @@ import {
 } from "../data/quran-meta";
 import type { SelectedRange } from "./RangeSelector";
 import type { Settings, SettingsActions } from "../App";
-import SettingsPanel from "./SettingsPanel";
+import SettingsOverlay from "./SettingsOverlay";
 import AyahText from "./AyahText";
 import { juzData } from "../data/quran-meta";
 import { ensurePageFont, getTajweedRuns } from "../data/quran-tajweed";
@@ -307,10 +307,12 @@ export default function QuizScreen({
   const lastRevealedRef = useRef<AyahReference | null>(null);
 
   const ayahStyle: React.CSSProperties = { fontSize: `${fontSize}px` };
-  // Bismillah ligature is slightly larger to balance visual weight with the
-  // surrounding ayah text but stays in proportion.
+  // The Bismillah ligature glyph (﷽) is rendered very wide by most fonts,
+  // so we cap it relative to the ayah size — same vertical metric, never
+  // wider than ~80% of the ayah's font size — so it never overpowers the
+  // verse beneath it.
   const bismillahStyle: React.CSSProperties = {
-    fontSize: `${Math.round(fontSize * 1.05)}px`,
+    fontSize: `${Math.min(36, Math.round(fontSize * 0.8))}px`,
   };
   const [showSettings, setShowSettings] = useState(false);
   const [showRangePicker, setShowRangePicker] = useState(false);
@@ -554,7 +556,7 @@ export default function QuizScreen({
 
   return (
     <div
-      className="bg-white dark:bg-neutral-950 animate-fade-in flex flex-col overflow-hidden h-dvh"
+      className="relative bg-white dark:bg-neutral-950 animate-fade-in flex flex-col overflow-hidden h-dvh"
       style={{
         paddingTop: "env(safe-area-inset-top)",
         paddingBottom: "env(safe-area-inset-bottom)",
@@ -562,6 +564,12 @@ export default function QuizScreen({
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
+      <SettingsOverlay
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        settings={settings}
+        actions={actions}
+      />
       <div className="max-w-2xl mx-auto w-full px-4 pt-4 pb-4 flex flex-col flex-1 min-h-0">
         <div className="flex items-center justify-between pb-4 shrink-0">
           <button
@@ -655,11 +663,6 @@ export default function QuizScreen({
           />
         )}
 
-        {showSettings && (
-          <div className="mb-4">
-            <SettingsPanel settings={settings} actions={actions} />
-          </div>
-        )}
 
         {loading ? (
           <div className="flex items-center justify-center flex-1 animate-fade-in-soft">
