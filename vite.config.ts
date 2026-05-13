@@ -63,12 +63,13 @@ export default defineConfig({
             },
           },
           {
-            // Audio recitations from everyayah.com — cache-first so once
-            // you've heard an ayah it plays instantly the next time.
-            urlPattern: /^https:\/\/(?:.+\.)?everyayah\.com\/.*\.mp3$/,
+            // Husary recitations from Tarteel's CDN — cache-first so once
+            // you've heard an ayah it plays instantly the next time and
+            // works offline.
+            urlPattern: /^https:\/\/audio-cdn\.tarteel\.ai\/quran\/husary\/.*\.mp3$/,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'ayah-audio',
+              cacheName: 'ayah-audio-husary',
               expiration: {
                 maxEntries: 500,
                 maxAgeSeconds: 60 * 60 * 24 * 90, // 90 days

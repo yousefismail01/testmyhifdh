@@ -7,26 +7,59 @@ interface Props {
 }
 
 /**
- * Tiny play/pause button that streams a single ayah from everyayah.com.
- * The HTMLAudioElement is created lazily on first click so we don't
- * fetch audio you never asked for. A new prompt rolling unmounts this
- * component (its key includes surah:ayah), so we don't have to listen
- * for prop changes to stop playback — the unmount tears the audio
- * element down.
+ * Module-level handle to whichever AyahAudioButton is currently playing.
+ * Before any button starts playback, it calls `stop()` on the registered
+ * holder to silence the previous ayah. The holder is cleared again on
+ * pause / end / unmount so the next start doesn't bother calling a
+ * stale closure. There's only ever zero or one entry — single-track UX,
+ * no playlists.
+ */
+let currentHolder: { stop: () => void } | null = null;
+
+function takeAudioFocus(holder: { stop: () => void }) {
+  if (currentHolder && currentHolder !== holder) currentHolder.stop();
+  currentHolder = holder;
+}
+
+function releaseAudioFocus(holder: { stop: () => void }) {
+  if (currentHolder === holder) currentHolder = null;
+}
+
+/**
+ * Tiny play/pause button that streams a single ayah from Tarteel's CDN
+ * (Husary recitation). The HTMLAudioElement is created lazily on first
+ * click so we don't fetch audio you never asked for.
+ *
+ * Only one ayah can play at a time across the whole app — starting a
+ * new one pauses whichever was previously playing via the module-level
+ * `currentHolder` above. A new prompt rolling unmounts this component
+ * (its key includes surah:ayah); the unmount effect tears the audio
+ * element down and releases audio focus.
  */
 export default function AyahAudioButton({ surah, ayah, ariaLabel }: Props) {
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Stable per-instance holder reference — registered with the singleton
+  // when this button starts playing, cleared when it stops or unmounts.
+  const holderRef = useRef<{ stop: () => void }>({
+    stop: () => {
+      const a = audioRef.current;
+      if (a && !a.paused) a.pause();
+    },
+  });
+
   // Make sure audio stops if the component is removed mid-playback.
   useEffect(() => {
+    const holder = holderRef.current;
     return () => {
       const a = audioRef.current;
       if (a) {
         a.pause();
         a.src = "";
       }
+      releaseAudioFocus(holder);
     };
   }, []);
 
@@ -34,25 +67,38 @@ export default function AyahAudioButton({ surah, ayah, ariaLabel }: Props) {
     if (audioRef.current && playing) {
       audioRef.current.pause();
       setPlaying(false);
+      releaseAudioFocus(holderRef.current);
       return;
     }
     if (audioRef.current && !playing) {
-      audioRef.current.play().catch(() => setPlaying(false));
+      takeAudioFocus(holderRef.current);
+      audioRef.current.play().catch(() => {
+        setPlaying(false);
+        releaseAudioFocus(holderRef.current);
+      });
       setPlaying(true);
       return;
     }
-    // First click: create the element. Mishary Alafasy 128kbps is a
-    // good default — gentle pace, complete vowelization, widely loved.
-    const url = `https://everyayah.com/data/Alafasy_128kbps/${String(
+    // First click: create the element. Mahmoud Khalil Al-Husary,
+    // Murattal Hafs — the gold-standard recitation for memorization
+    // (measured pace, complete vowelization, perfect tajweed). Served
+    // by Tarteel's CDN; URL pattern verified against their 6,236-ayah
+    // manifest.
+    const url = `https://audio-cdn.tarteel.ai/quran/husary/${String(
       surah
     ).padStart(3, "0")}${String(ayah).padStart(3, "0")}.mp3`;
     const a = new Audio(url);
     a.preload = "none";
-    a.addEventListener("ended", () => setPlaying(false));
+    a.addEventListener("ended", () => {
+      setPlaying(false);
+      releaseAudioFocus(holderRef.current);
+    });
     a.addEventListener("pause", () => {
       // Pause fires on both manual pause and end; only flip state if
-      // we're not at end (end already fired).
+      // we're not at end (end already fired). Either way the singleton
+      // pointer should drop so the next button doesn't shadow-pause us.
       if (!a.ended) setPlaying(false);
+      releaseAudioFocus(holderRef.current);
     });
     a.addEventListener("playing", () => {
       setLoading(false);
@@ -62,12 +108,15 @@ export default function AyahAudioButton({ surah, ayah, ariaLabel }: Props) {
     a.addEventListener("error", () => {
       setLoading(false);
       setPlaying(false);
+      releaseAudioFocus(holderRef.current);
     });
     audioRef.current = a;
     setLoading(true);
+    takeAudioFocus(holderRef.current);
     a.play().catch(() => {
       setLoading(false);
       setPlaying(false);
+      releaseAudioFocus(holderRef.current);
     });
   };
 
