@@ -34,8 +34,6 @@ export interface SettingsActions {
 
 export default function App() {
   const [range, setRange] = useState<SelectedRange | null>(null);
-  const [visible, setVisible] = useState<"setup" | "quiz">("setup");
-  const [transitioning, setTransitioning] = useState(false);
 
   const [theme, setTheme] = usePersistedState<Theme>("tmh.theme", "light");
   const [fontSize, setFontSize] = usePersistedState<FontSize>(
@@ -104,28 +102,15 @@ export default function App() {
     root.dir = isRTL(language) ? "rtl" : "ltr";
   }, [language]);
 
-  // Coordinated cross-fade between the setup and quiz screens. The
-  // setState-in-effect pattern is intentional here: it sequences a
-  // 200ms fade-out, a swap of the rendered screen, then a fade-in.
-  useEffect(() => {
-    const next = range ? "quiz" : "setup";
-    if (next === visible) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setTransitioning(true);
-    const t = setTimeout(() => {
-      setVisible(next);
-      setTransitioning(false);
-    }, 200);
-    return () => clearTimeout(t);
-  }, [range, visible]);
-
+  // Each screen owns its own entrance animation (animate-fade-in on the
+  // root). Swap the rendered tree synchronously when `range` changes —
+  // the wrapper used to do its own opacity cross-fade in addition, but
+  // that visibly competed with the new screen's mount animation and
+  // produced a small flash. Plain unmount + new screen's animation is
+  // smoother.
   return (
-    <div
-      className={`min-h-screen bg-white dark:bg-neutral-950 transition-opacity duration-200 ${
-        transitioning ? "opacity-0" : "opacity-100"
-      }`}
-    >
-      {visible === "quiz" && range ? (
+    <div className="min-h-screen bg-white dark:bg-neutral-950">
+      {range ? (
         <QuizScreen
           range={range}
           onBack={() => setRange(null)}
