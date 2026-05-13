@@ -33,10 +33,14 @@ export function ensurePageFont(page: number): void {
   if (typeof document === "undefined" || !("fonts" in document)) return;
   const family = `qpc-v4-p${page}`;
   try {
+    // font-display: block — the QPC v4 PUA codepoints overlap Arabic
+    // Presentation Forms in standard fonts, so a fallback font would
+    // flash a misrendered version of the text. `block` keeps the text
+    // invisible for ~100ms while the page font loads instead.
     const face = new FontFace(
       family,
       `url(/fonts/qpc-v4/p${page}.woff2) format("woff2")`,
-      { display: "swap" }
+      { display: "block" }
     );
     document.fonts.add(face);
     void face.load();

@@ -19,6 +19,7 @@ import type { Settings, SettingsActions, FontSize } from "../App";
 import SettingsPanel from "./SettingsPanel";
 import AyahText from "./AyahText";
 import { juzData } from "../data/quran-meta";
+import { ensurePageFont, getTajweedRuns } from "../data/quran-tajweed";
 
 interface Props {
   range: SelectedRange;
@@ -352,11 +353,18 @@ export default function QuizScreen({
     ).filter((a) => a.ayah < surahs[a.surah - 1].ayahCount);
   }, [rangeBounds]);
 
+  const warmFontsFor = (ref: AyahReference) => {
+    for (const run of getTajweedRuns(ref.surah, ref.ayah)) {
+      ensurePageFont(run.p);
+    }
+  };
+
   const rollNewAyah = useCallback(() => {
     if (ayahPool.length === 0) return;
     setLoading(true);
     setRevealedAyahs([]);
     const picked = pickWeightedRandomAyah(ayahPool);
+    warmFontsFor(picked);
     setCurrentAyah(picked);
     lastRevealedRef.current = picked;
     setPromptOnly(testFirstAyahs && picked.ayah === 1);
@@ -426,6 +434,7 @@ export default function QuizScreen({
 
     const nextRef = advanceOne(lastRevealedRef.current);
     if (!nextRef) return;
+    warmFontsFor(nextRef);
     const nextSurahInfo = surahs[nextRef.surah - 1];
     lastRevealedRef.current = nextRef;
     setRevealedAyahs((prev) => [
@@ -451,6 +460,7 @@ export default function QuizScreen({
     for (let i = 0; i < 10; i++) {
       const nextRef = advanceOne(cursor);
       if (!nextRef) break;
+      warmFontsFor(nextRef);
       const surahInfo = surahs[nextRef.surah - 1];
       newRevealed.push({
         surah: nextRef.surah,
