@@ -50,7 +50,7 @@ export default function App() {
   );
   const [testFirstAyahs, setTestFirstAyahs] = usePersistedState(
     "tmh.testFirstAyahs",
-    false
+    true
   );
   const [showAyahNumbers, setShowAyahNumbers] = usePersistedState(
     "tmh.showAyahNumbers",
