@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import RangeSelector, { type SelectedRange } from "./components/RangeSelector";
 import QuizScreen from "./components/QuizScreen";
 import { usePersistedState } from "./hooks/usePersistedState";
+import type { Language } from "./i18n/translations";
+import { isRTL } from "./i18n/translations";
 
 export type Theme = "light" | "dark";
 /** Quran-text font size in CSS pixels. 16–48 inclusive, integer steps. */
@@ -17,6 +19,7 @@ export interface Settings {
   testFirstAyahs: boolean;
   showAyahNumbers: boolean;
   tajweed: boolean;
+  language: Language;
 }
 
 export interface SettingsActions {
@@ -26,6 +29,7 @@ export interface SettingsActions {
   setTestFirstAyahs: React.Dispatch<React.SetStateAction<boolean>>;
   setShowAyahNumbers: React.Dispatch<React.SetStateAction<boolean>>;
   setTajweed: React.Dispatch<React.SetStateAction<boolean>>;
+  setLanguage: React.Dispatch<React.SetStateAction<Language>>;
 }
 
 export default function App() {
@@ -51,6 +55,10 @@ export default function App() {
     true
   );
   const [tajweed, setTajweed] = usePersistedState("tmh.tajweed", false);
+  const [language, setLanguage] = usePersistedState<Language>(
+    "tmh.language",
+    "en"
+  );
 
   const settings: Settings = {
     theme,
@@ -59,6 +67,7 @@ export default function App() {
     testFirstAyahs,
     showAyahNumbers,
     tajweed,
+    language,
   };
   const actions: SettingsActions = {
     setTheme,
@@ -67,6 +76,7 @@ export default function App() {
     setTestFirstAyahs,
     setShowAyahNumbers,
     setTajweed,
+    setLanguage,
   };
 
   useEffect(() => {
@@ -87,6 +97,12 @@ export default function App() {
       iosBar.content = theme === "dark" ? "black-translucent" : "default";
     }
   }, [theme]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.lang = language;
+    root.dir = isRTL(language) ? "rtl" : "ltr";
+  }, [language]);
 
   // Coordinated cross-fade between the setup and quiz screens. The
   // setState-in-effect pattern is intentional here: it sequences a

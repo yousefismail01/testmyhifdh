@@ -20,6 +20,7 @@ import SettingsPanel from "./SettingsPanel";
 import AyahText from "./AyahText";
 import { juzData } from "../data/quran-meta";
 import { ensurePageFont, getTajweedRuns } from "../data/quran-tajweed";
+import { useT } from "../i18n/useT";
 
 interface Props {
   range: SelectedRange;
@@ -33,11 +34,14 @@ function RangePopover({
   current,
   onApply,
   onClose,
+  language,
 }: {
   current: SelectedRange;
   onApply: (r: SelectedRange) => void;
   onClose: () => void;
+  language: Settings["language"];
 }) {
+  const t = useT(language);
   const [mode, setMode] = useState(current.mode);
   const [juzNumber, setJuzNumber] = useState(current.juzNumber ?? 30);
   const [startSurah, setStartSurah] = useState(current.startSurah ?? 1);
@@ -80,9 +84,9 @@ function RangePopover({
   };
 
   const tabs = [
-    { value: "juz" as const, label: "Juz" },
-    { value: "surah" as const, label: "Surah" },
-    { value: "page" as const, label: "Page" },
+    { value: "juz" as const, label: t("tabJuz") },
+    { value: "surah" as const, label: t("tabSurah") },
+    { value: "page" as const, label: t("tabPage") },
   ];
 
   return (
@@ -126,7 +130,7 @@ function RangePopover({
           <div className="grid grid-cols-[1fr_auto] gap-2">
             <div>
               <label className="block text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-1">
-                From Surah
+                {t("fromSurah")}
               </label>
               <select
                 value={startSurah}
@@ -150,7 +154,7 @@ function RangePopover({
             </div>
             <div className="w-20">
               <label className="block text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-1">
-                Ayah
+                {t("ayah")}
               </label>
               <input
                 type="number"
@@ -175,7 +179,7 @@ function RangePopover({
           <div className="grid grid-cols-[1fr_auto] gap-2">
             <div>
               <label className="block text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-1">
-                To Surah
+                {t("toSurah")}
               </label>
               <select
                 value={endSurah}
@@ -197,7 +201,7 @@ function RangePopover({
             </div>
             <div className="w-20">
               <label className="block text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-1">
-                Ayah
+                {t("ayah")}
               </label>
               <input
                 type="number"
@@ -223,7 +227,7 @@ function RangePopover({
         <div className="space-y-2">
           <div>
             <label className="block text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-1">
-              From Page
+              {t("fromPage")}
             </label>
             <input
               type="number"
@@ -238,7 +242,7 @@ function RangePopover({
           </div>
           <div>
             <label className="block text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-1">
-              To Page
+              {t("toPage")}
             </label>
             <input
               type="number"
@@ -261,13 +265,13 @@ function RangePopover({
           onClick={onClose}
           className="flex-1 py-2 text-sm font-medium text-neutral-600 dark:text-neutral-300 bg-neutral-50 dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg transition-colors"
         >
-          Cancel
+          {t("cancel")}
         </button>
         <button
           onClick={apply}
           className="flex-1 py-2 text-sm font-medium bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 rounded-lg transition-colors"
         >
-          Apply
+          {t("apply")}
         </button>
       </div>
     </div>
@@ -294,7 +298,9 @@ export default function QuizScreen({
     testFirstAyahs,
     showAyahNumbers,
     tajweed,
+    language,
   } = settings;
+  const t = useT(language);
   const [currentAyah, setCurrentAyah] = useState<AyahReference | null>(null);
   const [revealedAyahs, setRevealedAyahs] = useState<RevealedAyah[]>([]);
   const [loading, setLoading] = useState(true);
@@ -575,7 +581,7 @@ export default function QuizScreen({
                 d="M15 19l-7-7 7-7"
               />
             </svg>
-            Back
+            {t("back")}
           </button>
           <div className="flex items-center gap-2">
             <button
@@ -588,7 +594,7 @@ export default function QuizScreen({
                   ? "bg-neutral-900 dark:bg-neutral-100 border-neutral-900 dark:border-neutral-100 text-white dark:text-neutral-900"
                   : "text-neutral-500 dark:text-neutral-400 bg-neutral-50 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-100 hover:border-neutral-300"
               }`}
-              aria-label="Change range"
+              aria-label={t("changeRange")}
             >
               {getRangeLabel()}
               <svg
@@ -615,7 +621,7 @@ export default function QuizScreen({
                   ? "bg-neutral-900 dark:bg-neutral-100 border-neutral-900 dark:border-neutral-100 text-white dark:text-neutral-900"
                   : "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:border-neutral-300"
               }`}
-              aria-label="Settings"
+              aria-label={t("settings")}
             >
               <svg
                 className="w-4 h-4"
@@ -645,6 +651,7 @@ export default function QuizScreen({
             current={range}
             onApply={onRangeChange}
             onClose={() => setShowRangePicker(false)}
+            language={language}
           />
         )}
 
@@ -699,7 +706,7 @@ export default function QuizScreen({
                               </span>
                               {isLastAyah && (
                                 <span className="text-xs font-medium text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 px-3 py-1 rounded-full border border-rose-100 dark:border-rose-900/60">
-                                  Last ayah
+                                  {t("lastAyah")}
                                 </span>
                               )}
                             </div>
@@ -708,7 +715,7 @@ export default function QuizScreen({
                           {promptOnly ? (
                             <div className="text-center py-6">
                               <div className="text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-3">
-                                What's the first ayah of
+                                {t("whatsFirstAyahOf")}
                               </div>
                               <div className="font-quran text-5xl text-neutral-900 dark:text-neutral-100 mb-1">
                                 {currentSurahInfo!.nameArabic}
@@ -767,7 +774,7 @@ export default function QuizScreen({
                             </span>
                             {ra.isEndOfSurah && (
                               <span className="text-[10px] font-medium text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded-full border border-rose-100 dark:border-rose-900/60">
-                                Last ayah
+                                {t("lastAyah")}
                               </span>
                             )}
                           </div>
@@ -787,7 +794,7 @@ export default function QuizScreen({
 
                 {atRangeEnd && (
                   <div className="text-center text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 pt-2 pb-4 animate-fade-in-soft">
-                    End of range
+                    {t("endOfRange")}
                   </div>
                 )}
               </div>
@@ -800,14 +807,14 @@ export default function QuizScreen({
                 disabled={atRangeEnd}
                 className="flex-1 py-3 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 font-medium rounded-xl border border-neutral-200 dark:border-neutral-800 transition-all duration-200 active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none"
               >
-                {promptOnly ? "Reveal First Ayah" : "Reveal Next Ayah"}
+                {promptOnly ? t("revealFirstAyah") : t("revealNextAyah")}
               </button>
               <button
                 onClick={revealRemainingPage}
                 disabled={atRangeEnd}
                 className="flex-1 py-3 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 font-medium rounded-xl border border-neutral-200 dark:border-neutral-800 transition-all duration-200 active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none"
               >
-                Reveal More (+10)
+                {t("revealMore")}
               </button>
             </div>
 
@@ -815,7 +822,7 @@ export default function QuizScreen({
               onClick={rollNewAyah}
               className="w-full py-3.5 bg-neutral-900 dark:bg-neutral-100 hover:bg-neutral-800 dark:hover:bg-neutral-200 text-white dark:text-neutral-900 font-medium rounded-xl transition-all duration-200 active:scale-[0.99]"
             >
-              Next Random Ayah
+              {t("nextRandomAyah")}
             </button>
             </div>
           </div>

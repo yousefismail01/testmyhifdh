@@ -1,5 +1,8 @@
 import type { Settings, SettingsActions, Theme } from "../App";
 import { FONT_SIZE_MAX, FONT_SIZE_MIN } from "../App";
+import { LANGUAGE_NAMES } from "../i18n/translations";
+import type { Language } from "../i18n/translations";
+import { useT } from "../i18n/useT";
 
 interface Props {
   settings: Settings;
@@ -9,6 +12,7 @@ interface Props {
 }
 
 export default function SettingsPanel({ settings, actions, compact }: Props) {
+  const t = useT(settings.language);
   return (
     <div className="bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-5 space-y-4 animate-fade-in">
       {!compact && (
@@ -16,10 +20,10 @@ export default function SettingsPanel({ settings, actions, compact }: Props) {
           <label className="flex items-center justify-between cursor-pointer">
             <div className="pr-4">
               <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
-                Hide surah names
+                {t("hideSurahNames")}
               </div>
               <div className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
-                Don't show which surah the ayah is from
+                {t("hideSurahNamesDesc")}
               </div>
             </div>
             <input
@@ -32,11 +36,10 @@ export default function SettingsPanel({ settings, actions, compact }: Props) {
           <label className="flex items-center justify-between cursor-pointer">
             <div className="pr-4">
               <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
-                Test first ayahs
+                {t("testFirstAyahs")}
               </div>
               <div className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
-                When the rolled ayah is the first of a surah, show only the
-                surah name and you guess the ayah
+                {t("testFirstAyahsDesc")}
               </div>
             </div>
             <input
@@ -49,10 +52,10 @@ export default function SettingsPanel({ settings, actions, compact }: Props) {
           <label className="flex items-center justify-between cursor-pointer">
             <div className="pr-4">
               <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
-                Show ayah numbers
+                {t("showAyahNumbers")}
               </div>
               <div className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
-                Display an end-of-ayah marker with the ayah number
+                {t("showAyahNumbersDesc")}
               </div>
             </div>
             <input
@@ -65,10 +68,10 @@ export default function SettingsPanel({ settings, actions, compact }: Props) {
           <label className="flex items-center justify-between cursor-pointer">
             <div className="pr-4">
               <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
-                Tajweed
+                {t("tajweed")}
               </div>
               <div className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
-                Render with the QPC v4 tajweed-colored Mushaf font
+                {t("tajweedDesc")}
               </div>
             </div>
             <input
@@ -84,7 +87,7 @@ export default function SettingsPanel({ settings, actions, compact }: Props) {
       <div className="pt-1">
         <div className="flex items-baseline justify-between mb-2">
           <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
-            Text size
+            {t("textSize")}
           </div>
           <div className="font-quran tabular-nums text-xs text-neutral-500 dark:text-neutral-400">
             {settings.fontSize}px
@@ -97,31 +100,52 @@ export default function SettingsPanel({ settings, actions, compact }: Props) {
           step={1}
           value={settings.fontSize}
           onChange={(e) => actions.setFontSize(Number(e.target.value))}
-          aria-label="Quran text size"
+          aria-label={t("textSize")}
           className="w-full accent-neutral-900 dark:accent-neutral-100"
         />
         <div className="flex justify-between text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mt-1">
-          <span>Small</span>
-          <span>Large</span>
+          <span>{t("textSizeSmall")}</span>
+          <span>{t("textSizeLarge")}</span>
         </div>
       </div>
 
       <div className="pt-1">
         <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200 mb-2">
-          Theme
+          {t("theme")}
         </div>
         <div className="flex gap-1 bg-neutral-50 dark:bg-neutral-800 rounded-xl p-1">
-          {(["light", "dark"] as const).map((t) => (
+          {(["light", "dark"] as const).map((th) => (
             <button
-              key={t}
-              onClick={() => actions.setTheme(t as Theme)}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 capitalize ${
-                settings.theme === t
+              key={th}
+              onClick={() => actions.setTheme(th as Theme)}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
+                settings.theme === th
                   ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm"
                   : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
               }`}
             >
-              {t}
+              {th === "light" ? t("themeLight") : t("themeDark")}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="pt-1">
+        <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200 mb-2">
+          {t("language")}
+        </div>
+        <div className="flex gap-1 bg-neutral-50 dark:bg-neutral-800 rounded-xl p-1">
+          {(["en", "ar", "ur"] as const).map((lang) => (
+            <button
+              key={lang}
+              onClick={() => actions.setLanguage(lang as Language)}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
+                settings.language === lang
+                  ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm"
+                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+              }`}
+            >
+              {LANGUAGE_NAMES[lang]}
             </button>
           ))}
         </div>

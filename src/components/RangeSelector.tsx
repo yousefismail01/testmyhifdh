@@ -2,6 +2,7 @@ import { useState } from "react";
 import { surahs, juzData } from "../data/quran-meta";
 import type { Settings, SettingsActions } from "../App";
 import SettingsPanel from "./SettingsPanel";
+import { useT } from "../i18n/useT";
 
 export type RangeMode = "surah" | "juz" | "page";
 
@@ -23,6 +24,7 @@ interface Props {
 }
 
 export default function RangeSelector({ onStart, settings, actions }: Props) {
+  const t = useT(settings.language);
   const [mode, setMode] = useState<RangeMode>("juz");
   const [juzNumber, setJuzNumber] = useState(30);
   const [startSurah, setStartSurah] = useState(1);
@@ -66,9 +68,9 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
   };
 
   const tabs: { value: RangeMode; label: string }[] = [
-    { value: "juz", label: "Juz" },
-    { value: "surah", label: "Surah" },
-    { value: "page", label: "Page" },
+    { value: "juz", label: t("tabJuz") },
+    { value: "surah", label: t("tabSurah") },
+    { value: "page", label: t("tabPage") },
   ];
 
   return (
@@ -88,8 +90,8 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
             className="p-2 rounded-full border bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:border-neutral-300 transition-all duration-200"
             aria-label={
               settings.theme === "dark"
-                ? "Switch to light mode"
-                : "Switch to dark mode"
+                ? t("switchToLight")
+                : t("switchToDark")
             }
           >
             {settings.theme === "dark" ? (
@@ -124,7 +126,7 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
                 ? "bg-neutral-900 dark:bg-neutral-100 border-neutral-900 dark:border-neutral-100 text-white dark:text-neutral-900"
                 : "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:border-neutral-300"
             }`}
-            aria-label="Settings"
+            aria-label={t("settings")}
           >
             <svg
               className="w-4 h-4"
@@ -156,10 +158,10 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
 
         <div className="text-center mb-12 animate-slide-up">
           <h1 className="text-4xl font-medium text-neutral-900 dark:text-neutral-100 tracking-tight">
-            testmyhifdh.com
+            {t("appTitle")}
           </h1>
           <p className="text-neutral-400 dark:text-neutral-500 text-sm mt-2 tracking-wide">
-            test your memorization, ayah by ayah
+            {t("appTagline")}
           </p>
         </div>
 
@@ -187,7 +189,7 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
             {mode === "juz" && (
               <div>
                 <label className="block text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-3">
-                  Select Juz
+                  {t("selectJuz")}
                 </label>
                 <div className="grid grid-cols-6 gap-1.5">
                   {juzData.map((j) => (
@@ -212,7 +214,7 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
                 <div className="grid grid-cols-[1fr_auto] gap-2">
                   <div>
                     <label className="block text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-2">
-                      From Surah
+                      {t("fromSurah")}
                     </label>
                     <select
                       value={startSurah}
@@ -233,7 +235,7 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
                   </div>
                   <div className="w-24">
                     <label className="block text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-2">
-                      Ayah
+                      {t("ayah")}
                     </label>
                     <input
                       type="number"
@@ -259,7 +261,7 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
                 <div className="grid grid-cols-[1fr_auto] gap-2">
                   <div>
                     <label className="block text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-2">
-                      To Surah
+                      {t("toSurah")}
                     </label>
                     <select
                       value={endSurah}
@@ -281,7 +283,7 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
                   </div>
                   <div className="w-24">
                     <label className="block text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-2">
-                      Ayah
+                      {t("ayah")}
                     </label>
                     <input
                       type="number"
@@ -314,7 +316,7 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-2">
-                    From Page
+                    {t("fromPage")}
                   </label>
                   <input
                     type="number"
@@ -331,7 +333,7 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
                 </div>
                 <div>
                   <label className="block text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-2">
-                    To Page
+                    {t("toPage")}
                   </label>
                   <input
                     type="number"
@@ -354,7 +356,7 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
             onClick={handleStart}
             className="w-full mt-6 py-3.5 bg-neutral-900 dark:bg-neutral-100 hover:bg-neutral-800 dark:hover:bg-neutral-200 text-white dark:text-neutral-900 font-medium rounded-xl transition-all duration-200 active:scale-[0.99]"
           >
-            Begin
+            {t("begin")}
           </button>
         </div>
 
@@ -362,7 +364,7 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
           className="text-center text-neutral-300 dark:text-neutral-600 text-xs mt-8 animate-fade-in-soft"
           style={{ animationDelay: "200ms" }}
         >
-          Surahs are weighted equally — short surahs roll as often as long ones
+          {t("rangeFooter")}
         </p>
       </div>
     </div>
