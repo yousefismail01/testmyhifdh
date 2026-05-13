@@ -7,6 +7,11 @@ import {
   type AyahSegment,
 } from "../data/reciters";
 import { takeAudioFocus, releaseAudioFocus } from "../lib/audio-focus";
+import {
+  routeThroughGain,
+  setGain,
+  useGainForVolume,
+} from "../lib/audio-gain";
 
 interface Props {
   surah: number;
@@ -99,8 +104,14 @@ export default function AyahAudioButton({
     };
   }, []);
 
-  // Live-apply volume changes to a currently-loaded audio element.
+  // Live-apply volume changes. On iOS the audio.volume attribute is
+  // read-only — we control loudness via the shared Web Audio gain
+  // node instead. On other platforms element.volume works fine.
   useEffect(() => {
+    if (useGainForVolume) {
+      setGain(volume);
+      return;
+    }
     const a = audioRef.current;
     if (a) a.volume = Math.max(0, Math.min(1, volume / 100));
   }, [volume]);
@@ -152,8 +163,18 @@ export default function AyahAudioButton({
     // preload="auto" lets iOS start fetching as soon as the element
     // is in the DOM and play() is called within the user gesture.
     a.preload = "auto";
+    // crossOrigin must be set BEFORE assigning src for the CORS
+    // headers to apply on the audio fetch. Required for
+    // createMediaElementSource() routing in audio-gain.ts.
     a.crossOrigin = "anonymous";
-    a.volume = Math.max(0, Math.min(1, volume / 100));
+    // Element-level volume only works on non-iOS. On iOS the slider
+    // controls a shared Web Audio GainNode instead (see below).
+    if (useGainForVolume) {
+      a.volume = 1;
+      setGain(volume);
+    } else {
+      a.volume = Math.max(0, Math.min(1, volume / 100));
+    }
     a.playbackRate = Math.max(0.25, Math.min(4, playbackSpeed));
     // Native `loop` only for ayah-mode (one MP3 per verse). For
     // surah-mode the file contains every ayah of the surah —
@@ -168,6 +189,10 @@ export default function AyahAudioButton({
     a.style.opacity = "0";
     a.style.pointerEvents = "none";
     document.body.appendChild(a);
+    // Route through the shared Web Audio GainNode on iOS so the
+    // volume slider actually does something. On other platforms this
+    // is a no-op (useGainForVolume === false → returns false).
+    routeThroughGain(a);
     if (onTimeUpdate) {
       // Throttle to ~10 Hz via rAF. The browser fires `timeupdate`
       // at a higher rate (4–60 Hz, varies); for word highlighting we

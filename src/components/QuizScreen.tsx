@@ -36,6 +36,11 @@ import HintButton from "./HintButton";
 import KbdHint from "./KbdHint";
 import AyahAudioButton from "./AyahAudioButton";
 import { takeAudioFocus, releaseAudioFocus } from "../lib/audio-focus";
+import {
+  routeThroughGain,
+  setGain,
+  useGainForVolume,
+} from "../lib/audio-gain";
 import AyahTranslation from "./AyahTranslation";
 import TranslationHint from "./TranslationHint";
 import QuizSidebar from "./QuizSidebar";
@@ -690,16 +695,23 @@ export default function QuizScreen({
 
     // DOM-mounted audio element for iOS Safari reliability.
     const a = document.createElement("audio");
-    a.src = url;
     a.preload = "auto";
     a.crossOrigin = "anonymous";
-    a.volume = Math.max(0, Math.min(1, volume / 100));
+    a.src = url;
+    // Element volume on non-iOS; Web Audio GainNode on iOS.
+    if (useGainForVolume) {
+      a.volume = 1;
+      setGain(volume);
+    } else {
+      a.volume = Math.max(0, Math.min(1, volume / 100));
+    }
     a.style.position = "absolute";
     a.style.width = "1px";
     a.style.height = "1px";
     a.style.opacity = "0";
     a.style.pointerEvents = "none";
     document.body.appendChild(a);
+    routeThroughGain(a);
     snippetAudioRef.current = a;
 
     const applyBounds = (fromMs: number, toMs: number) => {

@@ -1,7 +1,10 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/next"
+// We're a Vite SPA, not a Next.js app, so use the `/react` entry —
+// the `/next` entry imports from `next/navigation` which doesn't exist
+// here and crashes the build.
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import App from "./App.tsx";
 import ErrorBoundary from "./components/ErrorBoundary.tsx";
 import "./index.css";
