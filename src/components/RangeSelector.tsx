@@ -87,8 +87,10 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
         settings={settings}
         actions={actions}
       />
-      <div className="w-full max-w-lg">
-        <div className="relative z-50 flex justify-end gap-2 mb-4">
+      <div
+        className="absolute z-50 flex gap-2 end-4 start-4 justify-end"
+        style={{ top: "max(1rem, env(safe-area-inset-top))" }}
+      >
           <button
             onClick={() =>
               actions.setTheme(settings.theme === "dark" ? "light" : "dark")
@@ -156,7 +158,7 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
           </button>
         </div>
 
-
+      <div className="w-full max-w-lg">
         <div className="text-center mb-12 animate-slide-up">
           <h1 className="text-4xl font-medium text-neutral-900 dark:text-neutral-100 tracking-tight">
             {t("appTitle")}
