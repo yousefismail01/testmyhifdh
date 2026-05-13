@@ -571,7 +571,7 @@ export default function QuizScreen({
         actions={actions}
       />
       <div className="max-w-2xl mx-auto w-full px-4 pt-4 pb-4 flex flex-col flex-1 min-h-0">
-        <div className="flex items-center justify-between pb-4 shrink-0">
+        <div className="relative z-50 flex items-center justify-between pb-4 shrink-0">
           <button
             onClick={onBack}
             className="flex items-center gap-2 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"

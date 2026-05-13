@@ -88,7 +88,7 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
         actions={actions}
       />
       <div className="w-full max-w-lg">
-        <div className="flex justify-end gap-2 mb-4">
+        <div className="relative z-50 flex justify-end gap-2 mb-4">
           <button
             onClick={() =>
               actions.setTheme(settings.theme === "dark" ? "light" : "dark")
