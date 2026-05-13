@@ -54,15 +54,14 @@ export function ensurePageFont(page: number): void {
   //   palette 4 (--qpc-plain-dark) — white base + marker accents    (plain, dark)
   //
   // Indices 10/11/12 in the CPAL drive the ayah-end rosette ornament's
-  // three color layers. Palette 3 (plain light) ships them as a cool
-  // teal / pink / pale-green set; palette 4 (plain dark) ships warmer
-  // tones. We force both palettes to the palette-3 cool set so the
-  // marker reads identically in light and dark.
+  // three color layers. Pin them in both plain palettes to a single
+  // gold-and-green Mushaf palette so the marker reads identically in
+  // light and dark.
   const ORNAMENT_OVERRIDES =
     "override-colors: " +
-    "10 #2ca4ab, " + // teal — rosette body
-    "11 #ff0080, " + // pink — inner accent
-    "12 #d8e9d8"; //   pale green — outline accent
+    "10 #1f8a6e, " + // medium green — rosette body
+    "11 #c19a3a, " + // warm gold — inner accent
+    "12 #2e544f"; //   deep teal — outline accent
   try {
     const style = document.createElement("style");
     style.textContent =
