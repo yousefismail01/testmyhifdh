@@ -682,15 +682,25 @@ export default function QuizScreen({
     if (prev) {
       prev.pause();
       prev.src = "";
+      prev.remove();
       snippetAudioRef.current = null;
     }
     const myVersion = ++snippetVersionRef.current;
     const info = getReciter(reciter);
     const url = info.audioUrl(hintTarget.surah, hintTarget.ayah);
 
-    const a = new Audio(url);
+    // DOM-mounted audio element for iOS Safari reliability.
+    const a = document.createElement("audio");
+    a.src = url;
     a.preload = "auto";
+    a.crossOrigin = "anonymous";
     a.volume = Math.max(0, Math.min(1, volume / 100));
+    a.style.position = "absolute";
+    a.style.width = "1px";
+    a.style.height = "1px";
+    a.style.opacity = "0";
+    a.style.pointerEvents = "none";
+    document.body.appendChild(a);
     snippetAudioRef.current = a;
 
     const applyBounds = (fromMs: number, toMs: number) => {
@@ -734,7 +744,11 @@ export default function QuizScreen({
       applyBounds(0, Infinity);
     }
 
-    a.play().catch(() => releaseAudioFocus(snippetHolderRef.current));
+    a.load();
+    a.play().catch((err) => {
+      console.warn("audio snippet play failed", err);
+      releaseAudioFocus(snippetHolderRef.current);
+    });
   };
 
   // Stop any in-flight snippet when the ayah changes.
@@ -744,6 +758,7 @@ export default function QuizScreen({
       if (a) {
         a.pause();
         a.src = "";
+        a.remove();
         snippetAudioRef.current = null;
       }
     };

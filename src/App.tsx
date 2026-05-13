@@ -7,6 +7,7 @@ import { isRTL } from "./i18n/translations";
 import { loadTajweed } from "./data/quran-tajweed";
 import { loadTranslation } from "./data/translations-en";
 import { loadSimilar } from "./data/similar-ayahs";
+import { installAudioUnlock } from "./lib/audio-unlock";
 import {
   loadReciterWords,
   loadReciterSegments,
@@ -210,6 +211,10 @@ export default function App() {
   // in-flight promise — no duplicate fetches.
   useEffect(() => {
     void loadTajweed();
+    // Install the iOS audio "unlock" listener — the first user
+    // interaction anywhere in the app primes Safari's audio
+    // subsystem so subsequent .play() calls actually work.
+    installAudioUnlock();
   }, []);
 
   // Pre-warm the translation file only if the user already has the

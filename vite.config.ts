@@ -63,22 +63,13 @@ export default defineConfig({
             },
           },
           {
-            // Recitations from Tarteel's CDN — cache-first so once
-            // you've heard an ayah it plays instantly the next time and
-            // works offline. Pattern matches both the ayah-mode reciters
-            // (/quran/{slug}/NNNMMM.mp3) and the surah-mode reciters
-            // (/quran/surah/{slug}/...mp3).
+            // Recitations from Tarteel's CDN. NetworkOnly so the
+            // service worker doesn't intercept the audio request —
+            // Workbox's range-response handling can confuse iOS Safari
+            // and break playback on mobile. Trade-off: no offline
+            // audio for now, but reliable mobile playback.
             urlPattern: /^https:\/\/audio-cdn\.tarteel\.ai\/quran\/.*\.mp3$/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'tarteel-audio',
-              expiration: {
-                maxEntries: 1000,
-                maxAgeSeconds: 60 * 60 * 24 * 90, // 90 days
-              },
-              cacheableResponse: { statuses: [0, 200] },
-              rangeRequests: true,
-            },
+            handler: 'NetworkOnly',
           },
           {
             // Per-reciter segment-timing JSON for surah-mode recitations.

@@ -89,6 +89,7 @@ export default function AyahAudioButton({
       if (a) {
         a.pause();
         a.src = "";
+        a.remove();
       }
       releaseAudioFocus(holder);
     };
@@ -117,6 +118,7 @@ export default function AyahAudioButton({
     if (!a) return;
     a.pause();
     a.src = "";
+    a.remove();
     audioRef.current = null;
     fromSecRef.current = null;
     stopAtRef.current = null;
@@ -133,11 +135,25 @@ export default function AyahAudioButton({
 
   const buildAyahAudio = (): HTMLAudioElement => {
     const info = getReciter(reciter);
-    const a = new Audio(info.audioUrl(surah, ayah));
-    a.preload = "none";
+    // Create the element via document.createElement and append to body.
+    // iOS Safari is more reliable about playing audio elements that
+    // are attached to the DOM than detached `new Audio()` objects.
+    const a = document.createElement("audio");
+    a.src = info.audioUrl(surah, ayah);
+    // preload="auto" lets iOS start fetching as soon as the element
+    // is in the DOM and play() is called within the user gesture.
+    a.preload = "auto";
+    a.crossOrigin = "anonymous";
     a.volume = Math.max(0, Math.min(1, volume / 100));
     a.playbackRate = Math.max(0.25, Math.min(4, playbackSpeed));
     a.loop = loop;
+    // Hide it visually but keep it in the document tree.
+    a.style.position = "absolute";
+    a.style.width = "1px";
+    a.style.height = "1px";
+    a.style.opacity = "0";
+    a.style.pointerEvents = "none";
+    document.body.appendChild(a);
     if (onTimeUpdate) {
       a.addEventListener("timeupdate", () => onTimeUpdate(a.currentTime));
     }
@@ -170,7 +186,14 @@ export default function AyahAudioButton({
     const a = buildAyahAudio();
     audioRef.current = a;
     setLoading(true);
-    a.play().catch(() => {
+    // .load() before .play() — iOS Safari is more reliable about
+    // initiating playback when load is called explicitly inside the
+    // user gesture.
+    a.load();
+    a.play().catch((err) => {
+      // Surface errors in dev tools; on iOS we sometimes see
+      // NotAllowedError when the gesture has been voided.
+      console.warn("audio play failed", err);
       setLoading(false);
       setPlaying(false);
       releaseAudioFocus(holderRef.current);
@@ -232,7 +255,9 @@ export default function AyahAudioButton({
       void loadReciterSegments(reciter).then(applySegments);
     }
 
-    a.play().catch(() => {
+    a.load();
+    a.play().catch((err) => {
+      console.warn("audio play failed", err);
       setLoading(false);
       setPlaying(false);
       releaseAudioFocus(holderRef.current);
@@ -287,7 +312,8 @@ export default function AyahAudioButton({
       ) {
         a.currentTime = fromSecRef.current;
       }
-      a.play().catch(() => {
+      a.play().catch((err) => {
+        console.warn("audio resume failed", err);
         setPlaying(false);
         releaseAudioFocus(holderRef.current);
       });
