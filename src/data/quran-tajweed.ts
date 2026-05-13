@@ -50,14 +50,25 @@ export function ensurePageFont(page: number): void {
   // The QPC v4 font ships 6 CPAL palettes. We reference three named:
   //   palette 0 (default)      — black base text + tajweed colors  (tajweed, light)
   //   palette 1 (--tajweed-dark) — white base text + tajweed colors  (tajweed, dark)
-  //   palette 3 (--qpc-plain)   — all black                          (plain, light)
-  //   palette 4 (--qpc-plain-dark) — all white                       (plain, dark)
+  //   palette 3 (--qpc-plain)   — black base + marker accents       (plain, light)
+  //   palette 4 (--qpc-plain-dark) — white base + marker accents    (plain, dark)
+  //
+  // Indices 10/11/12 in the CPAL drive the ayah-end rosette ornament's
+  // three color layers. They differ between palettes 3 and 4 (cool tones
+  // vs warm tones), which made the marker look like a different ornament
+  // in light vs dark. We override them in both plain palettes to a single
+  // gold-and-green Mushaf palette so the rosette reads the same in both.
+  const ORNAMENT_OVERRIDES =
+    "override-colors: " +
+    "10 #1f8a6e, " + // medium green — rosette body
+    "11 #c19a3a, " + // warm gold — inner accent
+    "12 #2e544f"; //   deep teal — outline accent
   try {
     const style = document.createElement("style");
     style.textContent =
       `@font-palette-values --tajweed-dark { font-family: "${family}"; base-palette: 1; }` +
-      `@font-palette-values --qpc-plain { font-family: "${family}"; base-palette: 3; }` +
-      `@font-palette-values --qpc-plain-dark { font-family: "${family}"; base-palette: 4; }`;
+      `@font-palette-values --qpc-plain { font-family: "${family}"; base-palette: 3; ${ORNAMENT_OVERRIDES}; }` +
+      `@font-palette-values --qpc-plain-dark { font-family: "${family}"; base-palette: 4; ${ORNAMENT_OVERRIDES}; }`;
     document.head.appendChild(style);
   } catch {
     /* font-palette-values unsupported — non-fatal */
