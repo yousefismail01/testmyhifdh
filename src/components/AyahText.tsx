@@ -20,8 +20,8 @@ interface Props {
   /**
    * Zero-based index of the word to highlight (for word-by-word
    * audio playback). When set and within range, an absolutely-
-   * positioned gray-gradient slides under the matching word with a
-   * CSS transition. -1 / undefined → no highlight.
+   * positioned gray block slides under the matching word with a CSS
+   * transition. -1 / undefined → no highlight.
    */
   highlightWordIndex?: number;
   className?: string;
@@ -43,13 +43,12 @@ interface HLRect {
  * set covers both tajweed-colored and plain-Mushaf rendering — the
  * `tajweed` prop just toggles which CPAL palette of the font is active.
  *
- * When `highlightWordIndex` is set, words are wrapped in per-word spans
- * with a `data-word-idx` attribute and a sliding gray-gradient overlay
- * tracks the active one. The overlay is a single absolutely-positioned
- * element that animates its top/left/width/height via CSS transitions —
- * so the highlight slides between words rather than popping in/out, and
- * it stays in place while audio is between word segments (the parent
- * only updates the index when a positive match is found).
+ * When `highlightWordIndex` is set, the run text stays as a single
+ * span (so the QPC v4 font's contextual word spacing remains intact)
+ * and the active word's bounding rect is measured via the Range API.
+ * An absolutely-positioned gray block animates over it via CSS
+ * transitions — sliding between words rather than popping in/out, and
+ * staying put while audio is between word segments.
  */
 export default function AyahText({
   surah,
@@ -101,7 +100,6 @@ export default function AyahText({
     .filter(Boolean)
     .join(" ");
 
-  // ---- Plain render (no highlighting requested) ----------------------------
   if (
     typeof highlightWordIndex !== "number" ||
     highlightWordIndex < 0
@@ -117,10 +115,6 @@ export default function AyahText({
     );
   }
 
-  // ---- Highlight render: per-word spans + sliding overlay ------------------
-  // Words are numbered cumulatively across runs to match the audio
-  // segment index. Each word span carries a `data-word-idx` attribute
-  // so the layout-effect measurer can find the active one.
   return (
     <HighlightedRender
       runs={runs}
@@ -146,47 +140,83 @@ function HighlightedRender({
   highlightWordIndex: number;
 }) {
   const containerRef = useRef<HTMLParagraphElement | null>(null);
+  const runRefs = useRef<Array<HTMLSpanElement | null>>([]);
   const [hl, setHl] = useState<HLRect | null>(null);
 
-  // Precompute cumulative word-start indices per run so each word knows
-  // its global position.
-  const wordsByRun = useMemo(
-    () => runs.map((r) => r.t.split(ZWSP)),
+  // Per-run char ranges for each word. Words are ZWSP-separated; we
+  // record [start, end) into the run's full text so the Range API
+  // can select exactly the word's characters without disturbing
+  // glyph shaping.
+  const charRanges = useMemo(
+    () =>
+      runs.map((run) => {
+        const ranges: Array<[number, number]> = [];
+        let start = 0;
+        for (let i = 0; i < run.t.length; i++) {
+          if (run.t[i] === ZWSP) {
+            ranges.push([start, i]);
+            start = i + 1;
+          }
+        }
+        ranges.push([start, run.t.length]);
+        return ranges;
+      }),
     [runs]
   );
+
+  // Cumulative word-start index per run.
   const runStartIdx = useMemo(() => {
     const acc: number[] = [];
     let n = 0;
-    for (const ws of wordsByRun) {
+    for (const cr of charRanges) {
       acc.push(n);
-      n += ws.length;
+      n += cr.length;
     }
     return acc;
-  }, [wordsByRun]);
+  }, [charRanges]);
 
-  // Re-measure the active word's bounding box whenever the index, the
-  // viewport, or the font size changes.
   useLayoutEffect(() => {
     const root = containerRef.current;
     if (!root) return;
     const measure = () => {
-      const el = root.querySelector<HTMLElement>(
-        `[data-word-idx="${highlightWordIndex}"]`
-      );
-      if (!el) return;
-      const rootRect = root.getBoundingClientRect();
-      const rect = el.getBoundingClientRect();
-      setHl({
-        top: rect.top - rootRect.top,
-        left: rect.left - rootRect.left,
-        width: rect.width,
-        height: rect.height,
-      });
+      // Find which run owns the active word.
+      let runIdx = -1;
+      let localIdx = -1;
+      for (let i = 0; i < runStartIdx.length; i++) {
+        const start = runStartIdx[i];
+        const end =
+          i + 1 < runStartIdx.length ? runStartIdx[i + 1] : Infinity;
+        if (highlightWordIndex >= start && highlightWordIndex < end) {
+          runIdx = i;
+          localIdx = highlightWordIndex - start;
+          break;
+        }
+      }
+      if (runIdx < 0) return;
+      const span = runRefs.current[runIdx];
+      if (!span || !span.firstChild) return;
+      const textNode = span.firstChild;
+      if (textNode.nodeType !== Node.TEXT_NODE) return;
+      const cr = charRanges[runIdx][localIdx];
+      if (!cr) return;
+      try {
+        const range = document.createRange();
+        range.setStart(textNode, cr[0]);
+        range.setEnd(textNode, cr[1]);
+        const rect = range.getBoundingClientRect();
+        const rootRect = root.getBoundingClientRect();
+        setHl({
+          top: rect.top - rootRect.top,
+          left: rect.left - rootRect.left,
+          width: rect.width,
+          height: rect.height,
+        });
+        range.detach?.();
+      } catch {
+        /* range API unavailable / text node mutated mid-measure */
+      }
     };
     measure();
-    // Re-measure on viewport changes. Font load completion can also
-    // shift glyph metrics, so listen to document.fonts.ready as a
-    // safety net.
     window.addEventListener("resize", measure);
     let cancelled = false;
     if ("fonts" in document) {
@@ -198,7 +228,7 @@ function HighlightedRender({
       cancelled = true;
       window.removeEventListener("resize", measure);
     };
-  }, [highlightWordIndex, runs]);
+  }, [highlightWordIndex, runs, runStartIdx, charRanges]);
 
   return (
     <p
@@ -222,23 +252,17 @@ function HighlightedRender({
           }}
         />
       )}
-      {runs.map((run, runIdx) => {
-        const words = wordsByRun[runIdx];
-        const startIdx = runStartIdx[runIdx];
-        return (
-          <span
-            key={runIdx}
-            style={{ fontFamily: `'qpc-v4-p${run.p}'`, position: "relative" }}
-          >
-            {words.map((w, wi) => (
-              <span key={wi}>
-                <span data-word-idx={startIdx + wi}>{w}</span>
-                {wi < words.length - 1 && ZWSP}
-              </span>
-            ))}
-          </span>
-        );
-      })}
+      {runs.map((run, runIdx) => (
+        <span
+          key={runIdx}
+          ref={(el) => {
+            runRefs.current[runIdx] = el;
+          }}
+          style={{ fontFamily: `'qpc-v4-p${run.p}'` }}
+        >
+          {run.t}
+        </span>
+      ))}
     </p>
   );
 }

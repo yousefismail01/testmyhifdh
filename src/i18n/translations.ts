@@ -77,6 +77,8 @@ const en = {
   volume: "Volume",
   playbackSpeed: "Playback speed",
   loop: "Loop",
+  sidebarContext: "Now reading",
+  sidebarEmpty: "Hints, translation, and similar verses appear here.",
   mutashabihatMode: "Mutashabihat only",
   mutashabihatModeDesc:
     "Restrict the roll pool to ayahs that have a known similar verse",
@@ -170,6 +172,8 @@ const ar: typeof en = {
   volume: "مستوى الصوت",
   playbackSpeed: "سرعة التشغيل",
   loop: "تكرار",
+  sidebarContext: "تقرأ الآن",
+  sidebarEmpty: "تظهر هنا التلميحات والترجمة والآيات المتشابهة.",
   mutashabihatMode: "المتشابهات فقط",
   mutashabihatModeDesc: "اقصر التدوير على الآيات التي لها متشابه معروف",
   audioOnly: "الصوت فقط",
@@ -262,6 +266,8 @@ const ur: typeof en = {
   volume: "آواز",
   playbackSpeed: "پلے بیک رفتار",
   loop: "تکرار",
+  sidebarContext: "ابھی پڑھ رہے ہیں",
+  sidebarEmpty: "ہنٹس، ترجمہ، اور مشابہ آیات یہاں ظاہر ہوں گی۔",
   mutashabihatMode: "صرف متشابہات",
   mutashabihatModeDesc:
     "صرف ان آیات کو منتخب کریں جن کے متشابہ آیات معلوم ہیں",

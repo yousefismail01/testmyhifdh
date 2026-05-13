@@ -161,10 +161,13 @@ export default function AyahAudioButton({
   };
 
   const startAyahMode = () => {
+    // Claim audio focus FIRST so the previous holder's stop() runs
+    // before we create our element. This guarantees the old audio is
+    // paused before the new one begins, with no race window.
+    takeAudioFocus(holderRef.current);
     const a = buildAyahAudio();
     audioRef.current = a;
     setLoading(true);
-    takeAudioFocus(holderRef.current);
     a.play().catch(() => {
       setLoading(false);
       setPlaying(false);
@@ -173,8 +176,11 @@ export default function AyahAudioButton({
   };
 
   const startSurahMode = async () => {
-    setLoading(true);
+    // Same as startAyahMode — silence the previous holder before we
+    // begin any of the surah-mode work (segment fetch, element
+    // creation, seek). Latest play call always wins.
     takeAudioFocus(holderRef.current);
+    setLoading(true);
     const info = getReciter(reciter);
     const segments = await loadReciterSegments(reciter);
     const seg = segments[`${surah}:${ayah}`];
@@ -254,6 +260,9 @@ export default function AyahAudioButton({
     }
     if (audioRef.current && !playing) {
       const a = audioRef.current;
+      // Claim audio focus FIRST so any other audio playing right now
+      // is paused before we resume — latest play call wins.
+      takeAudioFocus(holderRef.current);
       // Replay-from-end handling:
       //   Ayah-mode: if the file has hit its natural end, rewind to 0.
       //   Surah-mode: if currentTime is at or past the ayah's stop
@@ -269,7 +278,6 @@ export default function AyahAudioButton({
       ) {
         a.currentTime = fromSecRef.current;
       }
-      takeAudioFocus(holderRef.current);
       a.play().catch(() => {
         setPlaying(false);
         releaseAudioFocus(holderRef.current);
