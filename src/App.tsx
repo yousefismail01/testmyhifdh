@@ -7,7 +7,12 @@ import { isRTL } from "./i18n/translations";
 import { loadTajweed } from "./data/quran-tajweed";
 import { loadTranslation } from "./data/translations-en";
 import { loadSimilar } from "./data/similar-ayahs";
-import { loadReciterWords, type ReciterId } from "./data/reciters";
+import {
+  loadReciterWords,
+  loadReciterSegments,
+  getReciter,
+  type ReciterId,
+} from "./data/reciters";
 
 export type Theme = "light" | "dark";
 /** Quran-text font size in CSS pixels. 16–48 inclusive, integer steps. */
@@ -221,11 +226,16 @@ export default function App() {
     if (showSimilarPhrases) void loadSimilar();
   }, [showSimilarPhrases]);
 
-  // Pre-warm the active reciter's word-timing table so word-by-word
-  // highlighting kicks in as soon as the first ayah plays. Per-reciter
-  // file is ~250–500 KB gzipped; only one is loaded per session.
+  // Pre-warm the active reciter's word-timing and (for surah-mode
+  // reciters) segment tables. The segment fetch is critical on iOS
+  // Safari: startSurahMode reads from the cache *synchronously* to
+  // keep the audio.play() call inside the user gesture — an awaited
+  // promise after the click loses the gesture and silently rejects.
   useEffect(() => {
     void loadReciterWords(reciter);
+    if (getReciter(reciter).mode === "surah") {
+      void loadReciterSegments(reciter);
+    }
   }, [reciter]);
 
   // Each screen owns its own entrance animation (animate-fade-in on the

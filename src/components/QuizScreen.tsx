@@ -44,6 +44,7 @@ import { getSimilarAyahs, isSimilarReady, loadSimilar } from "../data/similar-ay
 import {
   getReciter,
   loadReciterSegments,
+  getCachedReciterSegments,
   loadReciterWords,
   getCachedReciterWords,
   type WordTimings,
@@ -669,14 +670,14 @@ export default function QuizScreen({
    * comes first). Coordinated with the main AyahAudioButton via the
    * shared audio-focus holder so the two can't overlap.
    */
-  const playAudioHint = async (step: number) => {
+  // Synchronous on purpose: audio.play() must stay inside the user
+  // gesture for iOS Safari to allow playback. Segment data is read
+  // from the cache; if cold, we still play (from t=0) and seek when
+  // the async fetch resolves. App.tsx pre-warms segments on reciter
+  // change, so the cold path is rare.
+  const playAudioHint = (step: number) => {
     if (!hintTarget) return;
-    // Claim audio focus IMMEDIATELY — this synchronously pauses
-    // whichever audio was previously playing (main button or another
-    // snippet) before we kick off any async work.
     takeAudioFocus(snippetHolderRef.current);
-    // Tear down any previous snippet element up front so it can't fire
-    // a stray timeupdate after the new one starts.
     const prev = snippetAudioRef.current;
     if (prev) {
       prev.pause();
@@ -684,42 +685,55 @@ export default function QuizScreen({
       snippetAudioRef.current = null;
     }
     const myVersion = ++snippetVersionRef.current;
-
     const info = getReciter(reciter);
     const url = info.audioUrl(hintTarget.surah, hintTarget.ayah);
-    let fromMs = 0;
-    let toMs = Infinity;
-    if (info.mode === "surah") {
-      const segs = await loadReciterSegments(reciter);
-      // While we awaited, another click might have superseded us —
-      // bail without creating a duplicate Audio element.
-      if (myVersion !== snippetVersionRef.current) return;
-      const seg = segs[`${hintTarget.surah}:${hintTarget.ayah}`];
-      if (seg) {
-        fromMs = seg[0];
-        toMs = seg[1];
-      }
-    }
 
     const a = new Audio(url);
     a.preload = "auto";
     a.volume = Math.max(0, Math.min(1, volume / 100));
     snippetAudioRef.current = a;
-    const requestedMs = step * HINT_AUDIO_STEP_MS;
-    const stopAtMs = Math.min(fromMs + requestedMs, toMs);
-    const stopAt = stopAtMs / 1000;
-    a.addEventListener("loadedmetadata", () => {
-      a.currentTime = fromMs / 1000;
-    });
-    a.addEventListener("timeupdate", () => {
-      if (a.currentTime >= stopAt) {
-        a.pause();
-        releaseAudioFocus(snippetHolderRef.current);
+
+    const applyBounds = (fromMs: number, toMs: number) => {
+      if (myVersion !== snippetVersionRef.current) return;
+      const requestedMs = step * HINT_AUDIO_STEP_MS;
+      const stopAtMs = Math.min(fromMs + requestedMs, toMs);
+      const stopAt = stopAtMs / 1000;
+      if (a.readyState >= 1) {
+        a.currentTime = fromMs / 1000;
+      } else {
+        a.addEventListener("loadedmetadata", () => {
+          a.currentTime = fromMs / 1000;
+        });
       }
-    });
-    a.addEventListener("ended", () =>
-      releaseAudioFocus(snippetHolderRef.current)
-    );
+      a.addEventListener("timeupdate", () => {
+        if (a.currentTime >= stopAt) {
+          a.pause();
+          releaseAudioFocus(snippetHolderRef.current);
+        }
+      });
+      a.addEventListener("ended", () =>
+        releaseAudioFocus(snippetHolderRef.current)
+      );
+    };
+
+    if (info.mode === "surah") {
+      const cached = getCachedReciterSegments(reciter);
+      if (cached) {
+        const seg = cached[`${hintTarget.surah}:${hintTarget.ayah}`];
+        applyBounds(seg ? seg[0] : 0, seg ? seg[1] : Infinity);
+      } else {
+        // Cold start — apply bounds when segments arrive. Until then
+        // the snippet plays from the surah start; pre-warming makes
+        // this nearly impossible to hit in practice.
+        void loadReciterSegments(reciter).then((segs) => {
+          const seg = segs[`${hintTarget.surah}:${hintTarget.ayah}`];
+          applyBounds(seg ? seg[0] : 0, seg ? seg[1] : Infinity);
+        });
+      }
+    } else {
+      applyBounds(0, Infinity);
+    }
+
     a.play().catch(() => releaseAudioFocus(snippetHolderRef.current));
   };
 
@@ -958,6 +972,14 @@ export default function QuizScreen({
     !promptOnly &&
     lastShown.surah === rangeBounds.endSurah &&
     lastShown.ayah === rangeBounds.endAyah;
+
+  // The setting `audioOnly` says "hide the prompt's text so the user
+  // listens to recite". Once they've revealed past it (i.e. they've
+  // checked themselves), the test is over — the prompt card reverts
+  // to a regular text card. The setting stays on for the *next* roll.
+  // Same idea as how promptOnly resets to false the moment the first
+  // reveal happens.
+  const effectiveAudioOnly = audioOnly && revealedAyahs.length === 0;
 
   /**
    * The ayah that hints target: the verse the user is *currently
@@ -1327,7 +1349,7 @@ export default function QuizScreen({
                           data-wheel-card
                           className="wheel-card bg-white dark:bg-neutral-900 rounded-3xl border-2 border-neutral-900/10 dark:border-neutral-100/15 p-7 ring-1 ring-neutral-900/5 dark:ring-neutral-100/10"
                         >
-                          {!promptOnly && !audioOnly && (
+                          {!promptOnly && !effectiveAudioOnly && (
                             <div className="text-center mb-4 flex items-center justify-center gap-2">
                               {!hideSurahName && (
                                 <span className="text-xs font-medium text-neutral-700 dark:text-neutral-200 bg-neutral-100 dark:bg-neutral-800 px-3 py-1 rounded-full">
@@ -1374,7 +1396,7 @@ export default function QuizScreen({
                             </div>
                           )}
 
-                          {audioOnly ? (
+                          {effectiveAudioOnly ? (
                             <div className="flex flex-col items-center gap-4 py-6">
                               {!hideSurahName && (
                                 <div className="text-xs font-medium text-neutral-700 dark:text-neutral-200 bg-neutral-100 dark:bg-neutral-800 px-3 py-1 rounded-full">
@@ -1431,15 +1453,15 @@ export default function QuizScreen({
                                 className="font-quran leading-[2.4] text-neutral-800 dark:text-neutral-200 text-right"
                                 style={ayahStyle}
                               />
-                              {/* Inline context only on phones / tablets.
-                                  At lg+, the QuizSidebar takes over. */}
+                              {/* Translation rides inline under every
+                                  ayah card on every breakpoint. Similar
+                                  verses still surface in the wide-screen
+                                  sidebar instead of inline. */}
                               {showTranslation && (
-                                <div className="lg:hidden">
-                                  <AyahTranslation
-                                    surah={currentAyah.surah}
-                                    ayah={currentAyah.ayah}
-                                  />
-                                </div>
+                                <AyahTranslation
+                                  surah={currentAyah.surah}
+                                  ayah={currentAyah.ayah}
+                                />
                               )}
                               {showSimilarPhrases && (
                                 <div className="lg:hidden">
@@ -1485,72 +1507,111 @@ export default function QuizScreen({
                         data-wheel-card
                         className="wheel-card animate-fade-in-soft bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-6"
                       >
-                        <div className="text-center mb-3 flex items-center justify-center gap-2">
-                          {!hideSurahName && (
-                            <span className="text-xs text-neutral-400 dark:text-neutral-500">
-                              {surahs[ra.surah - 1].nameArabic} : {ra.ayah}
-                            </span>
-                          )}
-                          {ra.isEndOfSurah && (
-                            <span className="text-[10px] font-medium text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded-full border border-rose-100 dark:border-rose-900/60">
-                              {t("lastAyah")}
-                            </span>
-                          )}
-                          <AyahAudioButton
-                            surah={ra.surah}
-                            ayah={ra.ayah}
-                            reciter={reciter}
-                            autoPlay={autoPlay && i === revealedAyahs.length - 1}
-                            volume={volume}
-                            playbackSpeed={playbackSpeed}
-                            loop={loop}
-                            onTimeUpdate={(sec) => {
-                              const idx = resolveWordIndex(
-                                ra.surah,
-                                ra.ayah,
-                                sec
-                              );
-                              if (idx < 0) return;
-                              const key = `${ra.surah}:${ra.ayah}`;
-                              setHighlightedAyahKey((p) =>
-                                p === key ? p : key
-                              );
-                              setHighlightedWordIdx((p) =>
-                                p === idx ? p : idx
-                              );
-                            }}
-                            ariaLabel={t("playAyah")}
-                          />
-                        </div>
-                        <AyahText
-                          surah={ra.surah}
-                          ayah={ra.ayah}
-                          showMarker={showAyahNumbers}
-                          tajweed={tajweed}
-                          highlightWordIndex={
-                            highlightedAyahKey === `${ra.surah}:${ra.ayah}`
-                              ? highlightedWordIdx
-                              : undefined
-                          }
-                          className="font-quran leading-[2.2] text-neutral-800 dark:text-neutral-200 text-right"
-                          style={ayahStyle}
-                        />
-                        {showTranslation && (
-                          <div className="lg:hidden">
-                            <AyahTranslation
+                        {audioOnly && i === revealedAyahs.length - 1 ? (
+                          // Audio-only mode: the newly-revealed ayah is the
+                          // active "next test" — render a big play button
+                          // and hide the text. Once the user reveals past
+                          // it, this card will lose the `last revealed`
+                          // condition and render as a regular text card.
+                          <div className="flex flex-col items-center gap-4 py-6">
+                            {!hideSurahName && (
+                              <div className="text-xs font-medium text-neutral-700 dark:text-neutral-200 bg-neutral-100 dark:bg-neutral-800 px-3 py-1 rounded-full">
+                                {surahs[ra.surah - 1].nameArabic} —{" "}
+                                {surahs[ra.surah - 1].name} : {ra.ayah}
+                              </div>
+                            )}
+                            <AyahAudioButton
+                              key={`${ra.surah}:${ra.ayah}:${reciter}`}
                               surah={ra.surah}
                               ayah={ra.ayah}
+                              reciter={reciter}
+                              size="lg"
+                              autoPlay={autoPlay}
+                              volume={volume}
+                              playbackSpeed={playbackSpeed}
+                              loop={loop}
+                              ariaLabel={t("playAyah")}
                             />
+                            <div className="text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
+                              {t("listenAndRecite")}
+                            </div>
+                            {ra.isEndOfSurah && (
+                              <span className="text-xs font-medium text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 px-3 py-1 rounded-full border border-rose-100 dark:border-rose-900/60">
+                                {t("lastAyah")}
+                              </span>
+                            )}
                           </div>
-                        )}
-                        {showSimilarPhrases && (
-                          <div className="lg:hidden">
-                            <AyahSimilarHint
+                        ) : (
+                          <>
+                            <div className="text-center mb-3 flex items-center justify-center gap-2">
+                              {!hideSurahName && (
+                                <span className="text-xs text-neutral-400 dark:text-neutral-500">
+                                  {surahs[ra.surah - 1].nameArabic} : {ra.ayah}
+                                </span>
+                              )}
+                              {ra.isEndOfSurah && (
+                                <span className="text-[10px] font-medium text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded-full border border-rose-100 dark:border-rose-900/60">
+                                  {t("lastAyah")}
+                                </span>
+                              )}
+                              <AyahAudioButton
+                                surah={ra.surah}
+                                ayah={ra.ayah}
+                                reciter={reciter}
+                                autoPlay={
+                                  autoPlay && i === revealedAyahs.length - 1
+                                }
+                                volume={volume}
+                                playbackSpeed={playbackSpeed}
+                                loop={loop}
+                                onTimeUpdate={(sec) => {
+                                  const idx = resolveWordIndex(
+                                    ra.surah,
+                                    ra.ayah,
+                                    sec
+                                  );
+                                  if (idx < 0) return;
+                                  const key = `${ra.surah}:${ra.ayah}`;
+                                  setHighlightedAyahKey((p) =>
+                                    p === key ? p : key
+                                  );
+                                  setHighlightedWordIdx((p) =>
+                                    p === idx ? p : idx
+                                  );
+                                }}
+                                ariaLabel={t("playAyah")}
+                              />
+                            </div>
+                            <AyahText
                               surah={ra.surah}
                               ayah={ra.ayah}
-                              language={language}
+                              showMarker={showAyahNumbers}
+                              tajweed={tajweed}
+                              highlightWordIndex={
+                                highlightedAyahKey ===
+                                `${ra.surah}:${ra.ayah}`
+                                  ? highlightedWordIdx
+                                  : undefined
+                              }
+                              className="font-quran leading-[2.2] text-neutral-800 dark:text-neutral-200 text-right"
+                              style={ayahStyle}
                             />
-                          </div>
+                            {showTranslation && (
+                              <AyahTranslation
+                                surah={ra.surah}
+                                ayah={ra.ayah}
+                              />
+                            )}
+                            {showSimilarPhrases && (
+                              <div className="lg:hidden">
+                                <AyahSimilarHint
+                                  surah={ra.surah}
+                                  ayah={ra.ayah}
+                                  language={language}
+                                />
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     </Fragment>
@@ -1615,7 +1676,6 @@ export default function QuizScreen({
               language={language}
               tajweed={tajweed}
               fontSize={fontSize}
-              showTranslation={showTranslation}
               showSimilarPhrases={showSimilarPhrases}
               hintFirstWordCount={hintFirstWordCount}
               hintTranslationStep={hintTranslationStep}

@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import {
   getReciter,
   loadReciterSegments,
+  getCachedReciterSegments,
   type ReciterId,
+  type AyahSegment,
 } from "../data/reciters";
 import { takeAudioFocus, releaseAudioFocus } from "../lib/audio-focus";
 
@@ -175,54 +177,61 @@ export default function AyahAudioButton({
     });
   };
 
-  const startSurahMode = async () => {
-    // Same as startAyahMode — silence the previous holder before we
-    // begin any of the surah-mode work (segment fetch, element
-    // creation, seek). Latest play call always wins.
+  // Important: this function is intentionally synchronous so the
+  // `audio.play()` call below stays inside the user gesture. iOS
+  // Safari voids the gesture after any awaited promise — even one
+  // that resolves immediately — and silently rejects subsequent play
+  // calls. Segment data is read from the cache synchronously (it's
+  // pre-warmed in App.tsx on reciter change); only the cold-start
+  // path defers seek+stop setup until the async load resolves.
+  const startSurahMode = () => {
     takeAudioFocus(holderRef.current);
     setLoading(true);
     const info = getReciter(reciter);
-    const segments = await loadReciterSegments(reciter);
-    const seg = segments[`${surah}:${ayah}`];
-    if (!seg) {
-      // No segment data for this ayah — fall back to playing from start.
-      // Better than silently doing nothing.
-      const a = buildAyahAudio();
-      a.src = info.audioUrl(surah, ayah);
-      audioRef.current = a;
-      a.play().catch(() => {
-        setLoading(false);
-        setPlaying(false);
-        releaseAudioFocus(holderRef.current);
-      });
-      return;
-    }
-    const [fromMs, toMs] = seg;
     const a = buildAyahAudio();
     a.src = info.audioUrl(surah, ayah);
-    fromSecRef.current = fromMs / 1000;
-    stopAtRef.current = toMs / 1000;
-    // Seek as soon as enough data has loaded; some browsers ignore
-    // currentTime assignment before metadata is parsed.
-    const onLoaded = () => {
-      a.currentTime = fromMs / 1000;
-      a.removeEventListener("loadedmetadata", onLoaded);
-    };
-    a.addEventListener("loadedmetadata", onLoaded);
-    a.addEventListener("timeupdate", () => {
-      const stopAt = stopAtRef.current;
-      if (stopAt != null && a.currentTime >= stopAt) {
-        a.pause();
-        // Manually fire "ended" semantics — we stopped mid-stream.
-        // Keep `stopAtRef` set so a subsequent play() still halts at
-        // the ayah boundary; the replay path will seek back to
-        // `fromSecRef` so the click actually replays this ayah
-        // instead of bleeding into the next.
-        setPlaying(false);
-        releaseAudioFocus(holderRef.current);
-      }
-    });
     audioRef.current = a;
+
+    const applySegments = (segs: Record<string, AyahSegment>) => {
+      const seg = segs[`${surah}:${ayah}`];
+      if (!seg) return;
+      const [fromMs, toMs] = seg;
+      fromSecRef.current = fromMs / 1000;
+      stopAtRef.current = toMs / 1000;
+      // Seek to the ayah's start. If metadata is already loaded we
+      // can do it inline; otherwise wait for it.
+      if (a.readyState >= 1) {
+        a.currentTime = fromMs / 1000;
+      } else {
+        const onLoaded = () => {
+          a.currentTime = fromMs / 1000;
+          a.removeEventListener("loadedmetadata", onLoaded);
+        };
+        a.addEventListener("loadedmetadata", onLoaded);
+      }
+      a.addEventListener("timeupdate", () => {
+        const stopAt = stopAtRef.current;
+        if (stopAt != null && a.currentTime >= stopAt) {
+          a.pause();
+          // Keep stopAtRef set so the next play() still halts at the
+          // ayah boundary; the replay path will seek back to fromSec.
+          setPlaying(false);
+          releaseAudioFocus(holderRef.current);
+        }
+      });
+    };
+
+    const cached = getCachedReciterSegments(reciter);
+    if (cached) {
+      applySegments(cached);
+    } else {
+      // Cold start — fetch lazily and apply when ready. The audio will
+      // start from t=0 (i.e. the surah's first ayah) for a brief
+      // moment until segments arrive; pre-warming in App.tsx makes
+      // this practically never happen.
+      void loadReciterSegments(reciter).then(applySegments);
+    }
+
     a.play().catch(() => {
       setLoading(false);
       setPlaying(false);
@@ -244,7 +253,7 @@ export default function AyahAudioButton({
       if (audioRef.current) return;
       const info = getReciter(reciter);
       if (info.mode === "ayah") startAyahMode();
-      else void startSurahMode();
+      else startSurahMode();
     }, 0);
     return () => window.clearTimeout(id);
   }, [autoPlay, reciter]);
@@ -285,10 +294,12 @@ export default function AyahAudioButton({
       setPlaying(true);
       return;
     }
-    // First click: kick off the appropriate flow.
+    // First click: kick off the appropriate flow. Both functions are
+    // synchronous so audio.play() stays inside the user gesture —
+    // critical for mobile Safari.
     const info = getReciter(reciter);
     if (info.mode === "ayah") startAyahMode();
-    else void startSurahMode();
+    else startSurahMode();
   };
 
   const isLg = size === "lg";

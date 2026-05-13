@@ -123,6 +123,20 @@ type WordMap = Record<string, WordTimings>;
 const segmentCache = new Map<ReciterId, SegmentMap>();
 const segmentLoading = new Map<ReciterId, Promise<SegmentMap>>();
 
+/**
+ * Synchronous read of the segment cache. Returns null if the table
+ * hasn't loaded yet — callers should fall back to `loadReciterSegments`
+ * for the async path. Used by the audio play path so we can call
+ * `audio.play()` inside the user gesture without an intervening await
+ * (critical on iOS Safari, which voids the gesture after any awaited
+ * promise even if it resolves synchronously).
+ */
+export function getCachedReciterSegments(
+  id: ReciterId
+): SegmentMap | null {
+  return segmentCache.get(id) ?? null;
+}
+
 const wordsCache = new Map<ReciterId, WordMap>();
 const wordsLoading = new Map<ReciterId, Promise<WordMap>>();
 

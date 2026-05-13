@@ -1,5 +1,4 @@
 import AyahText from "./AyahText";
-import AyahTranslation from "./AyahTranslation";
 import AyahSimilarHint from "./AyahSimilarHint";
 import TranslationHint from "./TranslationHint";
 import type { AyahReference } from "./../data/quran-meta";
@@ -8,14 +7,14 @@ import { useT } from "../i18n/useT";
 
 interface Props {
   /** Currently-displayed ayah (prompt or last revealed). Drives the
-   *  context shown — translation and similar-verses lookups. */
+   *  context shown — similar-verses lookup. Translation rides inline
+   *  under each ayah card instead of in the sidebar. */
   lastShown: AyahReference | null;
   /** Next ayah the user is trying to recite. Drives the hint card. */
   hintTarget: AyahReference | null;
   language: Language;
   tajweed: boolean;
   fontSize: number;
-  showTranslation: boolean;
   showSimilarPhrases: boolean;
   hintFirstWordCount: number;
   hintTranslationStep: number;
@@ -35,7 +34,6 @@ export default function QuizSidebar({
   language,
   tajweed,
   fontSize,
-  showTranslation,
   showSimilarPhrases,
   hintFirstWordCount,
   hintTranslationStep,
@@ -45,8 +43,7 @@ export default function QuizSidebar({
   const hintActive =
     !!hintTarget &&
     (hintFirstWordCount > 0 || hintTranslationStep > 0);
-  const hasContext =
-    !!lastShown && (showTranslation || showSimilarPhrases);
+  const hasContext = !!lastShown && showSimilarPhrases;
 
   if (!hintActive && !hasContext) {
     return (
@@ -103,16 +100,11 @@ export default function QuizSidebar({
           <div className="text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-3">
             {t("sidebarContext")}
           </div>
-          {showTranslation && (
-            <AyahTranslation surah={lastShown.surah} ayah={lastShown.ayah} />
-          )}
-          {showSimilarPhrases && (
-            <AyahSimilarHint
-              surah={lastShown.surah}
-              ayah={lastShown.ayah}
-              language={language}
-            />
-          )}
+          <AyahSimilarHint
+            surah={lastShown.surah}
+            ayah={lastShown.ayah}
+            language={language}
+          />
         </div>
       )}
     </aside>
