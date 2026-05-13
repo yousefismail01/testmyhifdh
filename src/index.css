@@ -117,6 +117,21 @@ body {
   animation: slide-up 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
+@keyframes fade-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.animate-fade-out {
+  animation: fade-out 0.18s cubic-bezier(0.4, 0, 1, 1) both;
+}
+
 .scrollbar-hide {
   scrollbar-width: none;
   -ms-overflow-style: none;
