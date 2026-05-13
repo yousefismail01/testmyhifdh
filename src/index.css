@@ -132,6 +132,37 @@ body {
   animation: fade-out 0.18s cubic-bezier(0.4, 0, 1, 1) both;
 }
 
+/**
+ * Respect prefers-reduced-motion at the system level. Each animation
+ * still resolves to its final state so layout doesn't break — only the
+ * motion is suppressed.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-fade-in-soft,
+  .animate-slide-up,
+  .animate-fade-out {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  * {
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Visually-hidden but still announced to screen readers. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .scrollbar-hide {
   scrollbar-width: none;
   -ms-overflow-style: none;

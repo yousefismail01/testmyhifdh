@@ -3,6 +3,8 @@ import { surahs, juzData } from "../data/quran-meta";
 import type { Settings, SettingsActions } from "../App";
 import SettingsOverlay from "./SettingsOverlay";
 import JuzCustomizer from "./JuzCustomizer";
+import KeyboardHelp from "./KeyboardHelp";
+import SurahCombobox from "./SurahCombobox";
 import { useT } from "../i18n/useT";
 import { useDragSelect } from "../hooks/useDragSelect";
 import { useKeyboard } from "../hooks/useKeyboard";
@@ -56,6 +58,7 @@ export default function RangeSelector({
   const [endPage, setEndPage] = useState(initialRange?.endPage ?? 20);
   const [showSettings, setShowSettings] = useState(false);
   const [customizing, setCustomizing] = useState<number[] | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
   // Anchor for two-tap range fill on the juz grid. First tap on an
   // unselected juz sets the anchor and adds that juz; a second tap on
   // another unselected juz unions every juz between the anchor and the
@@ -153,8 +156,10 @@ export default function RangeSelector({
       t: () =>
         actions.setTheme(settings.theme === "dark" ? "light" : "dark"),
       s: () => setShowSettings((v) => !v),
+      "?": () => setShowHelp(true),
       Escape: () => {
         if (customizing !== null) setCustomizing(null);
+        else if (showHelp) setShowHelp(false);
         else if (showSettings) setShowSettings(false);
       },
     },
@@ -198,6 +203,12 @@ export default function RangeSelector({
           }}
         />
       )}
+      <KeyboardHelp
+        open={showHelp}
+        onClose={() => setShowHelp(false)}
+        language={settings.language}
+        context="home"
+      />
       <div
         className="absolute z-50 inset-x-0 px-4 flex justify-center pointer-events-none"
         style={{ top: "max(1rem, env(safe-area-inset-top))" }}
@@ -285,10 +296,25 @@ export default function RangeSelector({
           className="bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-6 animate-slide-up"
           style={{ animationDelay: "60ms" }}
         >
-          <div className="flex gap-1 bg-neutral-50 dark:bg-neutral-800 rounded-2xl p-1 mb-6">
+          <div
+            role="tablist"
+            aria-label={t("tabJuz") + "/" + t("tabSurah") + "/" + t("tabPage")}
+            className="flex gap-1 bg-neutral-50 dark:bg-neutral-800 rounded-2xl p-1 mb-6"
+            onKeyDown={(e) => {
+              if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+              const idx = tabs.findIndex((tt) => tt.value === mode);
+              const dir = e.key === "ArrowRight" ? 1 : -1;
+              const next = (idx + dir + tabs.length) % tabs.length;
+              setMode(tabs[next].value);
+              e.preventDefault();
+            }}
+          >
             {tabs.map((tab) => (
               <button
                 key={tab.value}
+                role="tab"
+                aria-selected={mode === tab.value}
+                tabIndex={mode === tab.value ? 0 : -1}
                 onClick={() => setMode(tab.value)}
                 className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-medium transition-all duration-200 ${
                   mode === tab.value
@@ -377,22 +403,16 @@ export default function RangeSelector({
                     <label className="block text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-2">
                       {t("fromSurah")}
                     </label>
-                    <select
+                    <SurahCombobox
                       value={startSurah}
-                      onChange={(e) => {
-                        const v = Number(e.target.value);
+                      onChange={(v) => {
                         setStartSurah(v);
                         if (endSurah < v) setEndSurah(v);
                         setStartAyah(1);
                       }}
-                      className="w-full px-4 py-3 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-300 transition-all"
-                    >
-                      {surahs.map((s) => (
-                        <option key={s.number} value={s.number}>
-                          {s.number}. {s.name} — {s.nameArabic}
-                        </option>
-                      ))}
-                    </select>
+                      language={settings.language}
+                      ariaLabel={t("fromSurah")}
+                    />
                   </div>
                   <div className="w-24">
                     <label className="block text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-2">
@@ -424,23 +444,16 @@ export default function RangeSelector({
                     <label className="block text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-2">
                       {t("toSurah")}
                     </label>
-                    <select
+                    <SurahCombobox
                       value={endSurah}
-                      onChange={(e) => {
-                        const v = Number(e.target.value);
+                      onChange={(v) => {
                         setEndSurah(v);
                         setEndAyah(surahs[v - 1].ayahCount);
                       }}
-                      className="w-full px-4 py-3 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-300 transition-all"
-                    >
-                      {surahs
-                        .filter((s) => s.number >= startSurah)
-                        .map((s) => (
-                          <option key={s.number} value={s.number}>
-                            {s.number}. {s.name} — {s.nameArabic}
-                          </option>
-                        ))}
-                    </select>
+                      language={settings.language}
+                      minSurah={startSurah}
+                      ariaLabel={t("toSurah")}
+                    />
                   </div>
                   <div className="w-24">
                     <label className="block text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-2">

@@ -3,6 +3,8 @@ export type Language = "en" | "ar" | "ur";
 const en = {
   appTitle: "testmyhifdh.com",
   appTagline: "test your memorization, ayah by ayah",
+  juzLabel: "Juz",
+  pagesLabel: "Pages",
 
   back: "Back",
   begin: "Begin",
@@ -61,11 +63,19 @@ const en = {
   themeLight: "Light",
   themeDark: "Dark",
   language: "Language",
+  resetToDefaults: "Reset to defaults",
+  resetConfirm: "Reset all settings to their defaults?",
+  keyboardShortcuts: "Keyboard shortcuts",
+  searchSurahPlaceholder: "Search by name or number",
+  noResults: "No matches",
+  playAyah: "Play ayah recitation",
 };
 
 const ar: typeof en = {
   appTitle: "testmyhifdh.com",
   appTagline: "اختبر حفظك، آية بآية",
+  juzLabel: "الجزء",
+  pagesLabel: "الصفحات",
 
   back: "رجوع",
   begin: "ابدأ",
@@ -124,11 +134,19 @@ const ar: typeof en = {
   themeLight: "فاتح",
   themeDark: "داكن",
   language: "اللغة",
+  resetToDefaults: "إعادة الضبط الافتراضي",
+  resetConfirm: "إعادة تعيين جميع الإعدادات إلى القيم الافتراضية؟",
+  keyboardShortcuts: "اختصارات لوحة المفاتيح",
+  searchSurahPlaceholder: "ابحث بالاسم أو الرقم",
+  noResults: "لا توجد نتائج",
+  playAyah: "تشغيل تلاوة الآية",
 };
 
 const ur: typeof en = {
   appTitle: "testmyhifdh.com",
   appTagline: "اپنا حفظ آزمائیں، آیت بہ آیت",
+  juzLabel: "پارہ",
+  pagesLabel: "صفحات",
 
   back: "واپس",
   begin: "شروع کریں",
@@ -187,6 +205,12 @@ const ur: typeof en = {
   themeLight: "ہلکا",
   themeDark: "گہرا",
   language: "زبان",
+  resetToDefaults: "ڈیفالٹ پر بحال کریں",
+  resetConfirm: "تمام ترتیبات کو ڈیفالٹ پر بحال کریں؟",
+  keyboardShortcuts: "کی بورڈ شارٹ کٹس",
+  searchSurahPlaceholder: "نام یا نمبر سے تلاش کریں",
+  noResults: "کوئی نتیجہ نہیں",
+  playAyah: "آیت کی تلاوت چلائیں",
 };
 
 export const translations: Record<Language, typeof en> = { en, ar, ur };

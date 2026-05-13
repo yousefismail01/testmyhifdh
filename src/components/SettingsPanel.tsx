@@ -183,6 +183,16 @@ function PreferencesView({
           { value: "ur", label: LANGUAGE_NAMES.ur },
         ]}
       />
+
+      <button
+        type="button"
+        onClick={() => {
+          if (window.confirm(t("resetConfirm"))) actions.resetSettings();
+        }}
+        className="w-full mt-2 px-3 py-2.5 text-xs font-medium uppercase tracking-widest text-neutral-500 dark:text-neutral-400 bg-neutral-50 dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 hover:text-neutral-900 dark:hover:text-neutral-100 rounded-xl transition-colors"
+      >
+        {t("resetToDefaults")}
+      </button>
     </>
   );
 }

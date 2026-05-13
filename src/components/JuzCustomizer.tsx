@@ -7,6 +7,7 @@ import {
 } from "../data/quran-meta";
 import type { Language } from "../i18n/translations";
 import { useT } from "../i18n/useT";
+import { localizeNumber } from "../types/range";
 import { useDragSelect } from "../hooks/useDragSelect";
 import { useKeyboard } from "../hooks/useKeyboard";
 
@@ -241,14 +242,19 @@ export default function JuzCustomizer({
           </button>
           <div className="text-sm font-medium text-neutral-700 dark:text-neutral-200 truncate px-2">
             {view.kind === "surahs"
-              ? juzNumbers.length === 1
-                ? `Juz ${juzNumbers[0]}`
-                : juzNumbers.length <= 3
-                ? `Juz ${juzNumbers.join(", ")}`
-                : `Juz ${juzNumbers.slice(0, 2).join(", ")} +${
+              ? (() => {
+                  const n = (x: number) => localizeNumber(x, language);
+                  const word = t("juzLabel");
+                  if (juzNumbers.length === 1) return `${word} ${n(juzNumbers[0])}`;
+                  if (juzNumbers.length <= 3)
+                    return `${word} ${juzNumbers.map(n).join(", ")}`;
+                  return `${word} ${juzNumbers.slice(0, 2).map(n).join(", ")} +${n(
                     juzNumbers.length - 2
-                  }`
-              : surahs[view.surah - 1].name}
+                  )}`;
+                })()
+              : language === "en"
+              ? surahs[view.surah - 1].name
+              : surahs[view.surah - 1].nameArabic}
           </div>
           <div className="text-xs text-neutral-400 dark:text-neutral-500 tabular-nums w-12 text-right">
             {totalSelected}

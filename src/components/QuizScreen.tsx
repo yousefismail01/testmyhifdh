@@ -19,13 +19,18 @@ import {
   type SelectedRange,
   getSelectedJuzs,
   formatJuzList,
+  localizeNumber,
 } from "../types/range";
 import { useDragSelect } from "../hooks/useDragSelect";
 import { useKeyboard } from "../hooks/useKeyboard";
+import { useTajweedReady } from "../hooks/useTajweedReady";
 import type { Settings, SettingsActions } from "../App";
 import SettingsOverlay from "./SettingsOverlay";
 import AyahText from "./AyahText";
 import JuzCustomizer from "./JuzCustomizer";
+import KeyboardHelp from "./KeyboardHelp";
+import SurahCombobox from "./SurahCombobox";
+import AyahAudioButton from "./AyahAudioButton";
 import { juzData } from "../data/quran-meta";
 import { ensurePageFont, getTajweedRuns } from "../data/quran-tajweed";
 import { useT } from "../i18n/useT";
@@ -151,10 +156,24 @@ function RangePopover({
 
   return (
     <div className="bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-4 mb-4 animate-fade-in">
-      <div className="flex gap-1 bg-neutral-50 dark:bg-neutral-800 rounded-xl p-1 mb-4">
+      <div
+        role="tablist"
+        className="flex gap-1 bg-neutral-50 dark:bg-neutral-800 rounded-xl p-1 mb-4"
+        onKeyDown={(e) => {
+          if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+          const idx = tabs.findIndex((tt) => tt.value === mode);
+          const dir = e.key === "ArrowRight" ? 1 : -1;
+          const next = (idx + dir + tabs.length) % tabs.length;
+          setMode(tabs[next].value);
+          e.preventDefault();
+        }}
+      >
         {tabs.map((tab) => (
           <button
             key={tab.value}
+            role="tab"
+            aria-selected={mode === tab.value}
+            tabIndex={mode === tab.value ? 0 : -1}
             onClick={() => setMode(tab.value)}
             className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all duration-200 ${
               mode === tab.value
@@ -240,10 +259,9 @@ function RangePopover({
               <label className="block text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-1">
                 {t("fromSurah")}
               </label>
-              <select
+              <SurahCombobox
                 value={startSurah}
-                onChange={(e) => {
-                  const v = Number(e.target.value);
+                onChange={(v) => {
                   setStartSurah(v);
                   if (endSurah < v) {
                     setEndSurah(v);
@@ -251,14 +269,9 @@ function RangePopover({
                   }
                   setStartAyah(1);
                 }}
-                className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10"
-              >
-                {surahs.map((s) => (
-                  <option key={s.number} value={s.number}>
-                    {s.number}. {s.name}
-                  </option>
-                ))}
-              </select>
+                language={language}
+                ariaLabel={t("fromSurah")}
+              />
             </div>
             <div className="w-20">
               <label className="block text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-1">
@@ -289,23 +302,16 @@ function RangePopover({
               <label className="block text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-1">
                 {t("toSurah")}
               </label>
-              <select
+              <SurahCombobox
                 value={endSurah}
-                onChange={(e) => {
-                  const v = Number(e.target.value);
+                onChange={(v) => {
                   setEndSurah(v);
                   setEndAyah(surahs[v - 1].ayahCount);
                 }}
-                className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/10"
-              >
-                {surahs
-                  .filter((s) => s.number >= startSurah)
-                  .map((s) => (
-                    <option key={s.number} value={s.number}>
-                      {s.number}. {s.name}
-                    </option>
-                  ))}
-              </select>
+                language={language}
+                minSurah={startSurah}
+                ariaLabel={t("toSurah")}
+              />
             </div>
             <div className="w-20">
               <label className="block text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-1">
@@ -413,6 +419,7 @@ export default function QuizScreen({
   const [currentAyah, setCurrentAyah] = useState<AyahReference | null>(null);
   const [revealedAyahs, setRevealedAyahs] = useState<RevealedAyah[]>([]);
   const [loading, setLoading] = useState(true);
+  const tajweedReady = useTajweedReady();
   const lastRevealedRef = useRef<AyahReference | null>(null);
 
   const ayahStyle: React.CSSProperties = { fontSize: `${fontSize}px` };
@@ -426,6 +433,7 @@ export default function QuizScreen({
   const [showSettings, setShowSettings] = useState(false);
   const [showRangePicker, setShowRangePicker] = useState(false);
   const [customizing, setCustomizing] = useState<number[] | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
   const [promptOnly, setPromptOnly] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
@@ -540,14 +548,14 @@ export default function QuizScreen({
   }, [ayahPool, testFirstAyahs]);
 
   // Auto-roll a fresh ayah whenever the pool changes (e.g. user picked a
-  // new range). rollNewAyah sets state internally; that's exactly what
-  // we want to react to here.
+  // new range). Wait for the tajweed data to land first — otherwise
+  // AyahText would render empty until the fetch resolves.
   useEffect(() => {
-    if (ayahPool.length > 0) {
+    if (ayahPool.length > 0 && tajweedReady) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       rollNewAyah();
     }
-  }, [ayahPool, rollNewAyah]);
+  }, [ayahPool, rollNewAyah, tajweedReady]);
 
   // The mask gradient on .reveal-mask handles the top/bottom fade; no
   // per-card transforms are needed. Keep an empty handler so the onScroll
@@ -645,7 +653,7 @@ export default function QuizScreen({
   // Whether any modal/overlay owns the keyboard right now. While one is
   // open, only "Escape" (handled by the overlays themselves) should fire.
   const anyOverlayOpen =
-    showSettings || showRangePicker || customizing !== null;
+    showSettings || showRangePicker || customizing !== null || showHelp;
 
   useKeyboard(
     {
@@ -677,6 +685,7 @@ export default function QuizScreen({
       },
       t: () =>
         actions.setTheme(settings.theme === "dark" ? "light" : "dark"),
+      "?": () => setShowHelp(true),
     },
     !anyOverlayOpen
   );
@@ -685,7 +694,8 @@ export default function QuizScreen({
   useKeyboard(
     {
       Escape: () => {
-        if (customizing !== null) setCustomizing(null);
+        if (showHelp) setShowHelp(false);
+        else if (customizing !== null) setCustomizing(null);
         else if (showRangePicker) setShowRangePicker(false);
         else if (showSettings) setShowSettings(false);
       },
@@ -694,17 +704,29 @@ export default function QuizScreen({
   );
 
   const getRangeLabel = () => {
-    if (range.mode === "juz") return formatJuzList(getSelectedJuzs(range));
+    const n = (x: number) => localizeNumber(x, language);
+    const juzWord = t("juzLabel");
+    if (range.mode === "juz")
+      return formatJuzList(getSelectedJuzs(range), language, juzWord);
     if (range.mode === "custom") {
       const count = range.customAyahs?.length ?? 0;
       const juzs = getSelectedJuzs(range);
-      const base = juzs.length > 0 ? formatJuzList(juzs) : t("customLabel");
-      return `${base} · ${count}`;
+      const base =
+        juzs.length > 0
+          ? formatJuzList(juzs, language, juzWord)
+          : t("customLabel");
+      return `${base} · ${n(count)}`;
     }
     if (range.mode === "surah") {
-      const sName = surahs[range.startSurah! - 1].name;
-      const eName = surahs[range.endSurah! - 1].name;
-      const sCount = surahs[range.startSurah! - 1].ayahCount;
+      // For non-English UIs prefer the Arabic surah name; the dropdowns
+      // still let the user pick by transliteration, but the pill should
+      // feel native once the range is locked in.
+      const surahName = (s: number) =>
+        language === "en"
+          ? surahs[s - 1].name
+          : surahs[s - 1].nameArabic;
+      const sName = surahName(range.startSurah!);
+      const eName = surahName(range.endSurah!);
       const eCount = surahs[range.endSurah! - 1].ayahCount;
       const sA = range.startAyah ?? 1;
       const eA = range.endAyah ?? eCount;
@@ -712,15 +734,14 @@ export default function QuizScreen({
       const ePartial = eA < eCount;
       if (range.startSurah === range.endSurah) {
         if (!sPartial && !ePartial) return sName;
-        if (sA === eA) return `${sName} ${sA}`;
-        return `${sName} ${sA}-${eA}`;
+        if (sA === eA) return `${sName} ${n(sA)}`;
+        return `${sName} ${n(sA)}-${n(eA)}`;
       }
-      const sLabel = sPartial ? `${sName} ${sA}` : sName;
-      const eLabel = ePartial ? `${eName} ${eA}` : eName;
-      void sCount;
+      const sLabel = sPartial ? `${sName} ${n(sA)}` : sName;
+      const eLabel = ePartial ? `${eName} ${n(eA)}` : eName;
       return `${sLabel} – ${eLabel}`;
     }
-    return `Pages ${range.startPage} – ${range.endPage}`;
+    return `${t("pagesLabel")} ${n(range.startPage!)} – ${n(range.endPage!)}`;
   };
 
   const BISMILLAH_DISPLAY = "﷽";
@@ -747,6 +768,16 @@ export default function QuizScreen({
     !promptOnly &&
     lastShown.surah === rangeBounds.endSurah &&
     lastShown.ayah === rangeBounds.endAyah;
+
+  // Screen-reader-only announcement that flips with each new prompt or
+  // when the user reaches the end of the range. Uses surah names + ayah
+  // numbers (not the QPC PUA glyphs, which don't have a sensible spoken
+  // form). Kept short so VoiceOver / NVDA don't talk over the user.
+  const liveAnnouncement = (() => {
+    if (atRangeEnd) return t("endOfRange");
+    if (!currentAyah || !currentSurahInfo) return "";
+    return `${currentSurahInfo.name} ${currentAyah.ayah}`;
+  })();
 
   // Swipe-right-to-go-back gesture for mobile / PWA. Recorded on touchstart,
   // committed on touchend if the swipe is mostly horizontal, > 70px, and
@@ -807,6 +838,15 @@ export default function QuizScreen({
           }}
         />
       )}
+      <KeyboardHelp
+        open={showHelp}
+        onClose={() => setShowHelp(false)}
+        language={language}
+        context="quiz"
+      />
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {liveAnnouncement}
+      </div>
       <div className="max-w-2xl mx-auto w-full px-4 pt-4 pb-4 flex flex-col flex-1 min-h-0">
         <div className="relative z-50 flex items-center justify-between pb-4 shrink-0">
           <button
@@ -939,17 +979,25 @@ export default function QuizScreen({
                           data-wheel-card
                           className="wheel-card bg-white dark:bg-neutral-900 rounded-3xl border-2 border-neutral-900/10 dark:border-neutral-100/15 p-7 ring-1 ring-neutral-900/5 dark:ring-neutral-100/10"
                         >
-                          {!hideSurahName && !promptOnly && (
+                          {!promptOnly && (
                             <div className="text-center mb-4 flex items-center justify-center gap-2">
-                              <span className="text-xs font-medium text-neutral-700 dark:text-neutral-200 bg-neutral-100 dark:bg-neutral-800 px-3 py-1 rounded-full">
-                                {currentSurahInfo!.nameArabic} —{" "}
-                                {currentSurahInfo!.name} : {currentAyah.ayah}
-                              </span>
+                              {!hideSurahName && (
+                                <span className="text-xs font-medium text-neutral-700 dark:text-neutral-200 bg-neutral-100 dark:bg-neutral-800 px-3 py-1 rounded-full">
+                                  {currentSurahInfo!.nameArabic} —{" "}
+                                  {currentSurahInfo!.name} : {currentAyah.ayah}
+                                </span>
+                              )}
                               {isLastAyah && (
                                 <span className="text-xs font-medium text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 px-3 py-1 rounded-full border border-rose-100 dark:border-rose-900/60">
                                   {t("lastAyah")}
                                 </span>
                               )}
+                              <AyahAudioButton
+                                key={`${currentAyah.surah}:${currentAyah.ayah}`}
+                                surah={currentAyah.surah}
+                                ayah={currentAyah.ayah}
+                                ariaLabel={t("playAyah")}
+                              />
                             </div>
                           )}
 
@@ -1008,18 +1056,23 @@ export default function QuizScreen({
                         data-wheel-card
                         className="wheel-card animate-fade-in-soft bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-6"
                       >
-                        {!hideSurahName && (
-                          <div className="text-center mb-3 flex items-center justify-center gap-2">
+                        <div className="text-center mb-3 flex items-center justify-center gap-2">
+                          {!hideSurahName && (
                             <span className="text-xs text-neutral-400 dark:text-neutral-500">
                               {surahs[ra.surah - 1].nameArabic} : {ra.ayah}
                             </span>
-                            {ra.isEndOfSurah && (
-                              <span className="text-[10px] font-medium text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded-full border border-rose-100 dark:border-rose-900/60">
-                                {t("lastAyah")}
-                              </span>
-                            )}
-                          </div>
-                        )}
+                          )}
+                          {ra.isEndOfSurah && (
+                            <span className="text-[10px] font-medium text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded-full border border-rose-100 dark:border-rose-900/60">
+                              {t("lastAyah")}
+                            </span>
+                          )}
+                          <AyahAudioButton
+                            surah={ra.surah}
+                            ayah={ra.ayah}
+                            ariaLabel={t("playAyah")}
+                          />
+                        </div>
                         <AyahText
                           surah={ra.surah}
                           ayah={ra.ayah}

@@ -1,5 +1,3 @@
-import tajweedData from "./ayahs-tajweed.json";
-
 /** One run of consecutive words from a single Mushaf page. */
 export interface TajweedRun {
   /** Mushaf page number (1–604). Drives which page font to render with. */
@@ -8,8 +6,51 @@ export interface TajweedRun {
   t: string;
 }
 
-const runs = tajweedData as Record<string, TajweedRun[]>;
+type RunsMap = Record<string, TajweedRun[]>;
+
+let runs: RunsMap = {};
+let ready = false;
+let loadingPromise: Promise<void> | null = null;
+const listeners = new Set<() => void>();
+
 const loadedFonts = new Set<number>();
+
+/**
+ * Kicks off a fetch of /data/ayahs-tajweed.json the first time it's
+ * called, returning the same promise on subsequent calls. The JSON
+ * used to live inside the JS bundle (~648 KB raw / ~60 KB gzipped),
+ * which made first paint slower than it needed to be. Now it ships as
+ * a separate static asset that the app fetches once during startup.
+ */
+export function loadTajweed(): Promise<void> {
+  if (loadingPromise) return loadingPromise;
+  loadingPromise = (async () => {
+    try {
+      const res = await fetch("/data/ayahs-tajweed.json");
+      if (!res.ok) throw new Error(String(res.status));
+      runs = (await res.json()) as RunsMap;
+    } catch {
+      // Network failure or HTTP error — leave the runs map empty so the
+      // UI renders nothing rather than crashing. The user can hit reload.
+      runs = {};
+    } finally {
+      ready = true;
+      for (const listener of listeners) listener();
+    }
+  })();
+  return loadingPromise;
+}
+
+/** True once the tajweed runs data has loaded (or failed). */
+export function isTajweedReady(): boolean {
+  return ready;
+}
+
+/** Subscribe to readiness changes; returns an unsubscribe function. */
+export function subscribeTajweedReady(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
 
 export function getTajweedRuns(surah: number, ayah: number): TajweedRun[] {
   return runs[`${surah}:${ayah}`] ?? [];

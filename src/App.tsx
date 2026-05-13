@@ -4,6 +4,7 @@ import QuizScreen from "./components/QuizScreen";
 import { usePersistedState } from "./hooks/usePersistedState";
 import type { Language } from "./i18n/translations";
 import { isRTL } from "./i18n/translations";
+import { loadTajweed } from "./data/quran-tajweed";
 
 export type Theme = "light" | "dark";
 /** Quran-text font size in CSS pixels. 16–48 inclusive, integer steps. */
@@ -30,6 +31,7 @@ export interface SettingsActions {
   setShowAyahNumbers: React.Dispatch<React.SetStateAction<boolean>>;
   setTajweed: React.Dispatch<React.SetStateAction<boolean>>;
   setLanguage: React.Dispatch<React.SetStateAction<Language>>;
+  resetSettings: () => void;
 }
 
 export default function App() {
@@ -79,6 +81,15 @@ export default function App() {
     setShowAyahNumbers,
     setTajweed,
     setLanguage,
+    resetSettings: () => {
+      setTheme("light");
+      setFontSize(FONT_SIZE_DEFAULT);
+      setHideSurahName(false);
+      setTestFirstAyahs(true);
+      setShowAyahNumbers(true);
+      setTajweed(false);
+      setLanguage("en");
+    },
   };
 
   useEffect(() => {
@@ -105,6 +116,13 @@ export default function App() {
     root.lang = language;
     root.dir = isRTL(language) ? "rtl" : "ltr";
   }, [language]);
+
+  // Begin fetching the tajweed JSON on app mount so it's likely ready by
+  // the time the user clicks Begin. Subsequent calls return the same
+  // in-flight promise — no duplicate fetches.
+  useEffect(() => {
+    void loadTajweed();
+  }, []);
 
   // Each screen owns its own entrance animation (animate-fade-in on the
   // root). Swap the rendered tree synchronously when `range` changes —
