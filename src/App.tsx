@@ -10,7 +10,7 @@ export type Theme = "light" | "dark";
 export type FontSize = number;
 export const FONT_SIZE_MIN = 16;
 export const FONT_SIZE_MAX = 48;
-export const FONT_SIZE_DEFAULT = 26;
+export const FONT_SIZE_DEFAULT = 32;
 
 export interface Settings {
   theme: Theme;

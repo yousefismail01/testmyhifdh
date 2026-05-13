@@ -42,7 +42,14 @@ function RangePopover({
   language: Settings["language"];
 }) {
   const t = useT(language);
-  const [mode, setMode] = useState(current.mode);
+  // The popover only edits juz/surah/page. If we land here from a custom
+  // selection (drill-down customizer), fall back to the underlying juz tab
+  // so the UI renders something meaningful; the user can re-customize from
+  // the home screen instead.
+  type SimpleMode = "juz" | "surah" | "page";
+  const initialMode: SimpleMode =
+    current.mode === "custom" ? "juz" : current.mode;
+  const [mode, setMode] = useState<SimpleMode>(initialMode);
   const [juzNumber, setJuzNumber] = useState(current.juzNumber ?? 30);
   const [startSurah, setStartSurah] = useState(current.startSurah ?? 1);
   const [endSurah, setEndSurah] = useState(current.endSurah ?? 1);
@@ -332,6 +339,28 @@ export default function QuizScreen({
         endAyah: range.endAyah ?? base.endAyah,
       };
     }
+    if (range.mode === "custom") {
+      // Span the bounds from the first to the last selected ayah. Used by
+      // the atRangeEnd indicator on the reveal reel; the actual roll pool
+      // is the explicit customAyahs list (see ayahPool below).
+      const refs = range.customAyahs ?? [];
+      if (refs.length === 0) {
+        return {
+          startSurah: 1,
+          startAyah: 1,
+          endSurah: 1,
+          endAyah: 1,
+        };
+      }
+      const first = refs[0];
+      const last = refs[refs.length - 1];
+      return {
+        startSurah: first.surah,
+        startAyah: first.ayah,
+        endSurah: last.surah,
+        endAyah: last.ayah,
+      };
+    }
     const startPage = range.startPage!;
     const endPage = range.endPage!;
     let startSurah = 1;
@@ -349,13 +378,20 @@ export default function QuizScreen({
   }, [range]);
 
   const ayahPool = useMemo<AyahReference[]>(() => {
+    if (range.mode === "custom") {
+      // Use the explicit custom selection. Strip the last ayah of any surah
+      // so the rolled prompt always has something to reveal next.
+      return (range.customAyahs ?? []).filter(
+        (a) => a.ayah < surahs[a.surah - 1].ayahCount
+      );
+    }
     return getAyahsInRange(
       rangeBounds.startSurah,
       rangeBounds.startAyah,
       rangeBounds.endSurah,
       rangeBounds.endAyah
     ).filter((a) => a.ayah < surahs[a.surah - 1].ayahCount);
-  }, [rangeBounds]);
+  }, [range, rangeBounds]);
 
   const warmFontsFor = (ref: AyahReference) => {
     for (const run of getTajweedRuns(ref.surah, ref.ayah)) {
@@ -480,6 +516,11 @@ export default function QuizScreen({
 
   const getRangeLabel = () => {
     if (range.mode === "juz") return `Juz ${range.juzNumber}`;
+    if (range.mode === "custom") {
+      const count = range.customAyahs?.length ?? 0;
+      const base = range.juzNumber ? `Juz ${range.juzNumber}` : t("customLabel");
+      return `${base} · ${count}`;
+    }
     if (range.mode === "surah") {
       const sName = surahs[range.startSurah! - 1].name;
       const eName = surahs[range.endSurah! - 1].name;

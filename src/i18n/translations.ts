@@ -20,6 +20,15 @@ const en = {
   fromPage: "From Page",
   toPage: "To Page",
 
+  customize: "Customize",
+  customizeRange: "Customize range",
+  selectAll: "Select all",
+  clearAll: "Clear",
+  done: "Done",
+  customLabel: "Custom",
+  ayahsSelectedSuffix: "ayahs",
+  tapTwoHint: "Tap two ayahs to fill the range — tap a selected ayah to uncheck",
+
   rangeFooter: "Every ayah in your range has an equal chance of being rolled",
 
   revealFirstAyah: "Reveal First Ayah",
@@ -74,6 +83,15 @@ const ar: typeof en = {
   fromPage: "من صفحة",
   toPage: "إلى صفحة",
 
+  customize: "تخصيص",
+  customizeRange: "تخصيص المدى",
+  selectAll: "اختيار الكل",
+  clearAll: "مسح",
+  done: "تم",
+  customLabel: "مخصص",
+  ayahsSelectedSuffix: "آية",
+  tapTwoHint: "اضغط على آيتين لاختيار ما بينهما — اضغط على آية مختارة لإلغائها",
+
   rangeFooter: "لكل آية في المدى احتمال متساوٍ للظهور",
 
   revealFirstAyah: "اكشف الآية الأولى",
@@ -127,6 +145,15 @@ const ur: typeof en = {
   ayah: "آیت",
   fromPage: "سے صفحہ",
   toPage: "تک صفحہ",
+
+  customize: "حسبِ ضرورت",
+  customizeRange: "حد کو حسبِ ضرورت بنائیں",
+  selectAll: "سب منتخب کریں",
+  clearAll: "صاف کریں",
+  done: "ہو گیا",
+  customLabel: "حسبِ ضرورت",
+  ayahsSelectedSuffix: "آیات",
+  tapTwoHint: "دو آیات پر ٹیپ کر کے درمیانی حد منتخب کریں — منتخب آیت پر ٹیپ کر کے ہٹا دیں",
 
   rangeFooter: "حد کی ہر آیت کے رولنگ کا برابر امکان ہے",
 

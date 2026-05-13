@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { surahs, juzData } from "../data/quran-meta";
+import { surahs, juzData, type AyahReference } from "../data/quran-meta";
 import type { Settings, SettingsActions } from "../App";
 import SettingsOverlay from "./SettingsOverlay";
+import JuzCustomizer from "./JuzCustomizer";
 import { useT } from "../i18n/useT";
 
-export type RangeMode = "surah" | "juz" | "page";
+export type RangeMode = "surah" | "juz" | "page" | "custom";
 
 export interface SelectedRange {
   mode: RangeMode;
@@ -15,6 +16,10 @@ export interface SelectedRange {
   juzNumber?: number;
   startPage?: number;
   endPage?: number;
+  // Custom mode: an explicit list of ayahs (sorted by surah, then ayah).
+  // Built via the juz drill-down customizer. The juzNumber field is also
+  // set so the range pill can label the custom selection by its origin.
+  customAyahs?: AyahReference[];
 }
 
 interface Props {
@@ -34,6 +39,7 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
   const [startPage, setStartPage] = useState(1);
   const [endPage, setEndPage] = useState(20);
   const [showSettings, setShowSettings] = useState(false);
+  const [customizingJuz, setCustomizingJuz] = useState<number | null>(null);
 
   const startSurahInfo = surahs[startSurah - 1];
   const endSurahInfo = surahs[endSurah - 1];
@@ -87,6 +93,21 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
         settings={settings}
         actions={actions}
       />
+      {customizingJuz !== null && (
+        <JuzCustomizer
+          juzNumber={customizingJuz}
+          language={settings.language}
+          onCancel={() => setCustomizingJuz(null)}
+          onApply={(customAyahs) => {
+            setCustomizingJuz(null);
+            onStart({
+              mode: "custom",
+              juzNumber: customizingJuz,
+              customAyahs,
+            });
+          }}
+        />
+      )}
       <div
         className="absolute z-50 flex gap-2 end-4 start-4 justify-end"
         style={{ top: "max(1rem, env(safe-area-inset-top))" }}
@@ -209,6 +230,25 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
                     </button>
                   ))}
                 </div>
+                <button
+                  onClick={() => setCustomizingJuz(juzNumber)}
+                  className="mt-3 w-full flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium uppercase tracking-widest text-neutral-500 dark:text-neutral-400 bg-neutral-50 dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 hover:text-neutral-900 dark:hover:text-neutral-100 rounded-xl transition-all duration-150"
+                >
+                  {t("customizeRange")}
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                </button>
               </div>
             )}
 

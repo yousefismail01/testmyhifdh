@@ -197,6 +197,39 @@ export function getJuzRange(juzNumber: number) {
   };
 }
 
+/**
+ * Returns the list of surah segments that make up a juz, with the ayah
+ * range of each segment clipped to the juz boundaries. Used by the
+ * customize-range drill-down so each surah row knows its in-juz ayah
+ * span (e.g. surah 9 starts at ayah 1 in juz 11 but the previous juz
+ * ended mid-surah-9 at ayah 92, so juz 11's surah-9 segment is 93–129).
+ */
+export interface JuzSurahSegment {
+  surah: number;
+  startAyah: number;
+  endAyah: number;
+  totalAyahs: number; // ayahCount of the surah (unchanged)
+  segmentCount: number; // endAyah - startAyah + 1
+}
+
+export function getJuzSurahs(juzNumber: number): JuzSurahSegment[] {
+  const juz = juzData[juzNumber - 1];
+  const segments: JuzSurahSegment[] = [];
+  for (let s = juz.startSurah; s <= juz.endSurah; s++) {
+    const surah = surahs[s - 1];
+    const startAyah = s === juz.startSurah ? juz.startAyah : 1;
+    const endAyah = s === juz.endSurah ? juz.endAyah : surah.ayahCount;
+    segments.push({
+      surah: s,
+      startAyah,
+      endAyah,
+      totalAyahs: surah.ayahCount,
+      segmentCount: endAyah - startAyah + 1,
+    });
+  }
+  return segments;
+}
+
 export function getSurahRange(from: number, to: number) {
   return {
     startSurah: from,

@@ -30,7 +30,7 @@ export default function SettingsOverlay({
         className="fixed inset-0 z-40 bg-black/0 animate-fade-in-soft"
       />
       <div
-        className="absolute inset-x-4 z-50 animate-fade-in"
+        className="absolute z-50 animate-fade-in start-4 end-4 sm:start-auto sm:w-96"
         style={{ top: "max(4.5rem, calc(env(safe-area-inset-top) + 4rem))" }}
         onClick={(e) => e.stopPropagation()}
       >
