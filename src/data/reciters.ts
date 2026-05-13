@@ -31,6 +31,13 @@ export interface ReciterInfo {
   audioUrl: (surah: number, ayah: number) => string;
   /** For surah-mode reciters, the path to the segment-timing JSON. */
   segmentsUrl?: string;
+  /**
+   * Per-word timing JSON, used to highlight the active word during
+   * playback. Maps "surah:ayah" → `[[startMs, endMs], ...]`. Optional —
+   * Alafasy doesn't have word-level data, so highlighting is silently
+   * skipped for him.
+   */
+  wordsUrl?: string;
 }
 
 const pad = (n: number, w: number) => String(n).padStart(w, "0");
@@ -42,6 +49,7 @@ export const reciters: ReciterInfo[] = [
     name: { en: "Husary", ar: "الحصري", ur: "حصری" },
     audioUrl: (s, a) =>
       `https://audio-cdn.tarteel.ai/quran/husary/${pad(s, 3)}${pad(a, 3)}.mp3`,
+    wordsUrl: "/data/words-husary.json",
   },
   {
     id: "alafasy",
@@ -49,6 +57,8 @@ export const reciters: ReciterInfo[] = [
     name: { en: "Alafasy", ar: "العفاسي", ur: "العفاسی" },
     audioUrl: (s, a) =>
       `https://audio-cdn.tarteel.ai/quran/alafasy/${pad(s, 3)}${pad(a, 3)}.mp3`,
+    // No word-segment data published for Alafasy on this endpoint —
+    // highlighting silently skips for him.
   },
   {
     id: "minshawi",
@@ -59,6 +69,7 @@ export const reciters: ReciterInfo[] = [
         a,
         3
       )}.mp3`,
+    wordsUrl: "/data/words-minshawi.json",
   },
   {
     id: "maherAlMuaiqly",
@@ -69,6 +80,7 @@ export const reciters: ReciterInfo[] = [
         a,
         3
       )}.mp3`,
+    wordsUrl: "/data/words-maherAlMuaiqly.json",
   },
   {
     id: "abdulBasit",
@@ -80,6 +92,7 @@ export const reciters: ReciterInfo[] = [
         3
       )}.mp3`,
     segmentsUrl: "/data/segments-abdulBasit.json",
+    wordsUrl: "/data/words-abdulBasit.json",
   },
   {
     id: "yasserAlDosari",
@@ -91,6 +104,7 @@ export const reciters: ReciterInfo[] = [
         3
       )}.mp3`,
     segmentsUrl: "/data/segments-yasserAlDosari.json",
+    wordsUrl: "/data/words-yasserAlDosari.json",
   },
 ];
 
@@ -102,8 +116,51 @@ export function getReciter(id: ReciterId): ReciterInfo {
 export type AyahSegment = [number, number];
 type SegmentMap = Record<string, AyahSegment>;
 
+/** Per-word `[startMs, endMs]` array, indexed by word position. */
+export type WordTimings = [number, number][];
+type WordMap = Record<string, WordTimings>;
+
 const segmentCache = new Map<ReciterId, SegmentMap>();
 const segmentLoading = new Map<ReciterId, Promise<SegmentMap>>();
+
+const wordsCache = new Map<ReciterId, WordMap>();
+const wordsLoading = new Map<ReciterId, Promise<WordMap>>();
+
+/**
+ * Lazy-load the per-word timing table for the given reciter. Returns
+ * an empty map if the reciter has no published word-segment data
+ * (Alafasy) or the fetch fails — callers should just skip highlighting
+ * in that case. Files are ~250–500 KB gzipped each; fetched on first
+ * audio play and cached for the rest of the session.
+ */
+export async function loadReciterWords(id: ReciterId): Promise<WordMap> {
+  const cached = wordsCache.get(id);
+  if (cached) return cached;
+  const inflight = wordsLoading.get(id);
+  if (inflight) return inflight;
+  const info = getReciter(id);
+  if (!info.wordsUrl) return {};
+  const p = (async () => {
+    try {
+      const res = await fetch(info.wordsUrl!);
+      if (!res.ok) throw new Error(String(res.status));
+      const data = (await res.json()) as WordMap;
+      wordsCache.set(id, data);
+      return data;
+    } catch {
+      wordsCache.set(id, {});
+      return {};
+    } finally {
+      wordsLoading.delete(id);
+    }
+  })();
+  wordsLoading.set(id, p);
+  return p;
+}
+
+export function getCachedReciterWords(id: ReciterId): WordMap | null {
+  return wordsCache.get(id) ?? null;
+}
 
 /**
  * Lazy-load the per-ayah segment table for a surah-mode reciter. The

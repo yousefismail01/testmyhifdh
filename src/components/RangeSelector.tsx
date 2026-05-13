@@ -5,7 +5,7 @@ import SettingsOverlay from "./SettingsOverlay";
 import JuzCustomizer from "./JuzCustomizer";
 import KeyboardHelp from "./KeyboardHelp";
 import SurahCombobox from "./SurahCombobox";
-import VolumeOverlay from "./VolumeOverlay";
+import AudioOverlay from "./AudioOverlay";
 import VolumeIcon from "./VolumeIcon";
 import { useT } from "../i18n/useT";
 import { useDragSelect } from "../hooks/useDragSelect";
@@ -212,11 +212,11 @@ export default function RangeSelector({
         language={settings.language}
         context="home"
       />
-      <VolumeOverlay
+      <AudioOverlay
         open={showVolume}
         onClose={() => setShowVolume(false)}
-        value={settings.volume}
-        onChange={actions.setVolume}
+        settings={settings}
+        actions={actions}
         language={settings.language}
         containerWidth="max-w-lg"
       />
@@ -262,7 +262,11 @@ export default function RangeSelector({
             )}
           </button>
           <button
-            onClick={() => setShowVolume((v) => !v)}
+            onClick={() => {
+              const next = !showVolume;
+              setShowVolume(next);
+              if (next) setShowSettings(false);
+            }}
             className={`p-2 rounded-full border transition-all duration-200 ${
               showVolume
                 ? "bg-neutral-900 dark:bg-neutral-100 border-neutral-900 dark:border-neutral-100 text-white dark:text-neutral-900"
@@ -273,7 +277,11 @@ export default function RangeSelector({
             <VolumeIcon level={settings.volume} />
           </button>
           <button
-            onClick={() => setShowSettings((v) => !v)}
+            onClick={() => {
+              const next = !showSettings;
+              setShowSettings(next);
+              if (next) setShowVolume(false);
+            }}
             className={`p-2 rounded-full border transition-all duration-200 ${
               showSettings
                 ? "bg-neutral-900 dark:bg-neutral-100 border-neutral-900 dark:border-neutral-100 text-white dark:text-neutral-900"

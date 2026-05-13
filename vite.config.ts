@@ -90,6 +90,20 @@ export default defineConfig({
             },
           },
           {
+            // Per-reciter word-by-word timing tables (~270–500 KB
+            // gzipped each). Used for word highlighting during audio.
+            urlPattern: /\/data\/words-.*\.json$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'reciter-words',
+              expiration: {
+                maxEntries: 20,
+                maxAgeSeconds: 60 * 60 * 24 * 90,
+              },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
             // Translation table (~286 KB gzipped). Stale-while-revalidate
             // so a returning user gets the cached copy instantly.
             urlPattern: /\/data\/translation-.*\.json$/,

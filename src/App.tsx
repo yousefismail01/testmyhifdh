@@ -7,7 +7,7 @@ import { isRTL } from "./i18n/translations";
 import { loadTajweed } from "./data/quran-tajweed";
 import { loadTranslation } from "./data/translations-en";
 import { loadSimilar } from "./data/similar-ayahs";
-import type { ReciterId } from "./data/reciters";
+import { loadReciterWords, type ReciterId } from "./data/reciters";
 
 export type Theme = "light" | "dark";
 /** Quran-text font size in CSS pixels. 16–48 inclusive, integer steps. */
@@ -31,6 +31,12 @@ export interface Settings {
   autoPlay: boolean;
   /** Output volume for ayah playback, 0–100. */
   volume: number;
+  /** Playback rate multiplier, 0.5–2.0 (1.0 = normal). */
+  playbackSpeed: number;
+  /** When true, the audio loops the current ayah indefinitely. */
+  loop: boolean;
+  /** When true, only roll ayahs that have a known mutashabihat pair. */
+  mutashabihatMode: boolean;
   /** Show English translation beneath each ayah as a hint. */
   showTranslation: boolean;
   /** Show "this ayah has similar wording in X:Y" cross-references. */
@@ -49,6 +55,9 @@ export interface SettingsActions {
   setAudioOnly: React.Dispatch<React.SetStateAction<boolean>>;
   setAutoPlay: React.Dispatch<React.SetStateAction<boolean>>;
   setVolume: React.Dispatch<React.SetStateAction<number>>;
+  setPlaybackSpeed: React.Dispatch<React.SetStateAction<number>>;
+  setLoop: React.Dispatch<React.SetStateAction<boolean>>;
+  setMutashabihatMode: React.Dispatch<React.SetStateAction<boolean>>;
   setShowTranslation: React.Dispatch<React.SetStateAction<boolean>>;
   setShowSimilarPhrases: React.Dispatch<React.SetStateAction<boolean>>;
   resetSettings: () => void;
@@ -93,6 +102,15 @@ export default function App() {
   );
   const [autoPlay, setAutoPlay] = usePersistedState("tmh.autoPlay", false);
   const [volume, setVolume] = usePersistedState<number>("tmh.volume", 100);
+  const [playbackSpeed, setPlaybackSpeed] = usePersistedState<number>(
+    "tmh.playbackSpeed",
+    1
+  );
+  const [loop, setLoop] = usePersistedState<boolean>("tmh.loop", false);
+  const [mutashabihatMode, setMutashabihatMode] = usePersistedState<boolean>(
+    "tmh.mutashabihatMode",
+    false
+  );
   const [showTranslation, setShowTranslation] = usePersistedState(
     "tmh.showTranslation",
     false
@@ -114,6 +132,9 @@ export default function App() {
     audioOnly,
     autoPlay,
     volume,
+    playbackSpeed,
+    loop,
+    mutashabihatMode,
     showTranslation,
     showSimilarPhrases,
   };
@@ -129,6 +150,9 @@ export default function App() {
     setAudioOnly,
     setAutoPlay,
     setVolume,
+    setPlaybackSpeed,
+    setLoop,
+    setMutashabihatMode,
     setShowTranslation,
     setShowSimilarPhrases,
     resetSettings: () => {
@@ -143,6 +167,9 @@ export default function App() {
       setAudioOnly(false);
       setAutoPlay(false);
       setVolume(100);
+      setPlaybackSpeed(1);
+      setLoop(false);
+      setMutashabihatMode(false);
       setShowTranslation(false);
       setShowSimilarPhrases(false);
     },
@@ -193,6 +220,13 @@ export default function App() {
   useEffect(() => {
     if (showSimilarPhrases) void loadSimilar();
   }, [showSimilarPhrases]);
+
+  // Pre-warm the active reciter's word-timing table so word-by-word
+  // highlighting kicks in as soon as the first ayah plays. Per-reciter
+  // file is ~250–500 KB gzipped; only one is loaded per session.
+  useEffect(() => {
+    void loadReciterWords(reciter);
+  }, [reciter]);
 
   // Each screen owns its own entrance animation (animate-fade-in on the
   // root). Swap the rendered tree synchronously when `range` changes —

@@ -30,16 +30,22 @@ import AyahText from "./AyahText";
 import JuzCustomizer from "./JuzCustomizer";
 import KeyboardHelp from "./KeyboardHelp";
 import SurahCombobox from "./SurahCombobox";
-import VolumeOverlay from "./VolumeOverlay";
+import AudioOverlay from "./AudioOverlay";
 import VolumeIcon from "./VolumeIcon";
+import HintButton from "./HintButton";
+import KbdHint from "./KbdHint";
 import AyahAudioButton from "./AyahAudioButton";
 import { takeAudioFocus, releaseAudioFocus } from "../lib/audio-focus";
 import AyahTranslation from "./AyahTranslation";
 import TranslationHint from "./TranslationHint";
 import AyahSimilarHint from "./AyahSimilarHint";
+import { getSimilarAyahs, isSimilarReady, loadSimilar } from "../data/similar-ayahs";
 import {
   getReciter,
   loadReciterSegments,
+  loadReciterWords,
+  getCachedReciterWords,
+  type WordTimings,
 } from "../data/reciters";
 import { juzData } from "../data/quran-meta";
 import { ensurePageFont, getTajweedRuns } from "../data/quran-tajweed";
@@ -428,6 +434,9 @@ export default function QuizScreen({
     audioOnly,
     autoPlay,
     volume,
+    playbackSpeed,
+    loop,
+    mutashabihatMode,
     showTranslation,
     showSimilarPhrases,
   } = settings;
@@ -451,6 +460,16 @@ export default function QuizScreen({
   const [customizing, setCustomizing] = useState<number[] | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [showVolume, setShowVolume] = useState(false);
+  // Word-by-word highlight state. Keyed by the surah:ayah being played
+  // so we can swap highlights between the prompt and revealed cards.
+  const [highlightedAyahKey, setHighlightedAyahKey] = useState<string | null>(
+    null
+  );
+  const [highlightedWordIdx, setHighlightedWordIdx] = useState<number>(-1);
+  // Word timings for the active reciter; lazily populated.
+  const [activeReciterWords, setActiveReciterWords] = useState<
+    Record<string, WordTimings>
+  >(() => getCachedReciterWords(reciter) ?? {});
   const [promptOnly, setPromptOnly] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
@@ -516,6 +535,30 @@ export default function QuizScreen({
     };
   }, [range]);
 
+  // Trigger the similar-ayahs fetch when the user enables mutashabihat
+  // mode — the pool filter needs the index loaded to work. Cheap (~24
+  // KB gzipped) so we can do it whenever the toggle flips on.
+  useEffect(() => {
+    if (mutashabihatMode) void loadSimilar();
+  }, [mutashabihatMode]);
+  const [similarReady, setSimilarReady] = useState<boolean>(isSimilarReady);
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (!mutashabihatMode) return;
+    if (isSimilarReady()) {
+      setSimilarReady(true);
+      return;
+    }
+    let cancelled = false;
+    void loadSimilar().then(() => {
+      if (!cancelled) setSimilarReady(isSimilarReady());
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [mutashabihatMode]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   const ayahPool = useMemo<AyahReference[]>(() => {
     // Build the raw pool, then strip:
     //   (a) the last ayah of any surah — nothing to reveal next, and the
@@ -524,10 +567,18 @@ export default function QuizScreen({
     //   (b) the last ayah of the user's selected range — if it got rolled
     //       the reveal buttons would be disabled instantly (atRangeEnd
     //       fires) so there'd be nothing to recite.
+    //   (c) when mutashabihatMode is on AND the similar index is loaded,
+    //       only ayahs with at least one recorded similar verse pass.
     const isRangeEnd = (a: AyahReference) =>
       a.surah === rangeBounds.endSurah && a.ayah === rangeBounds.endAyah;
-    const promptable = (a: AyahReference) =>
-      a.ayah < surahs[a.surah - 1].ayahCount && !isRangeEnd(a);
+    const hasSimilar = (a: AyahReference) =>
+      getSimilarAyahs(a.surah, a.ayah).length > 0;
+    const promptable = (a: AyahReference) => {
+      if (a.ayah >= surahs[a.surah - 1].ayahCount) return false;
+      if (isRangeEnd(a)) return false;
+      if (mutashabihatMode && similarReady && !hasSimilar(a)) return false;
+      return true;
+    };
 
     if (range.mode === "custom") {
       return (range.customAyahs ?? []).filter(promptable);
@@ -544,7 +595,7 @@ export default function QuizScreen({
       rangeBounds.endSurah,
       rangeBounds.endAyah
     ).filter(promptable);
-  }, [range, rangeBounds]);
+  }, [range, rangeBounds, mutashabihatMode, similarReady]);
 
   const warmFontsFor = (ref: AyahReference) => {
     for (const run of getTajweedRuns(ref.surah, ref.ayah)) {
@@ -579,12 +630,23 @@ export default function QuizScreen({
   const [hintAudioStep, setHintAudioStep] = useState(0);
   const [hintTranslationStep, setHintTranslationStep] = useState(0);
   const [hintMenuOpen, setHintMenuOpen] = useState(false);
+  // Which hint type was last triggered. Long-press on the Hint button
+  // cycles to the next type and fires it immediately, skipping the
+  // menu — power users can drill faster.
+  type HintType = "firstWord" | "audio" | "translation";
+  const [lastHintType, setLastHintType] = useState<HintType>("firstWord");
 
   const resetHints = () => {
     setHintFirstWordCount(0);
     setHintAudioStep(0);
     setHintTranslationStep(0);
     setHintMenuOpen(false);
+    setLastHintType("firstWord");
+  };
+
+  const resetHighlight = () => {
+    setHighlightedAyahKey(null);
+    setHighlightedWordIdx(-1);
   };
   const snippetAudioRef = useRef<HTMLAudioElement | null>(null);
   const snippetHolderRef = useRef<{ stop: () => void }>({
@@ -675,6 +737,7 @@ export default function QuizScreen({
     lastRevealedRef.current = picked;
     setPromptOnly(testFirstAyahs && picked.ayah === 1);
     resetHints();
+    resetHighlight();
     setLoading(false);
   }, [ayahPool, testFirstAyahs]);
 
@@ -727,6 +790,7 @@ export default function QuizScreen({
       // belongs to a different target. Tear it down — the user can
       // request a fresh hint if they want one for the new ayah.
       resetHints();
+    resetHighlight();
       return;
     }
 
@@ -749,6 +813,7 @@ export default function QuizScreen({
       },
     ]);
     resetHints();
+    resetHighlight();
   };
 
   // Whether any modal/overlay owns the keyboard right now. While one is
@@ -784,8 +849,12 @@ export default function QuizScreen({
       Escape: () => onBack(),
       Backspace: () => onBack(),
       s: () => {
-        setShowSettings((v) => !v);
-        if (!showSettings) setShowRangePicker(false);
+        const next = !showSettings;
+        setShowSettings(next);
+        if (next) {
+          setShowRangePicker(false);
+          setShowVolume(false);
+        }
       },
       t: () =>
         actions.setTheme(settings.theme === "dark" ? "light" : "dark"),
@@ -890,6 +959,47 @@ export default function QuizScreen({
     if (!lastShown) return null;
     return advanceOne(lastShown);
   })();
+
+  // Lazy-fetch the per-word timing table for the active reciter the
+  // first time it's needed. Used to highlight the current word during
+  // playback. Files are ~250–500 KB gzipped each; only one reciter's
+  // table loads per session.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const cached = getCachedReciterWords(reciter);
+    if (cached) {
+      setActiveReciterWords(cached);
+      return;
+    }
+    let cancelled = false;
+    void loadReciterWords(reciter).then((data) => {
+      if (!cancelled) setActiveReciterWords(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [reciter]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Resolve the word index for an audio playback time (in seconds) on
+  // a given ayah. Returns -1 if no match. Surah-mode reciters share a
+  // single segment timeline per surah, so the time arrives unmodified;
+  // ayah-mode reciters' files start at 0 per ayah.
+  const resolveWordIndex = (
+    surahNumber: number,
+    ayahNumber: number,
+    timeSec: number
+  ): number => {
+    const segs = activeReciterWords[`${surahNumber}:${ayahNumber}`];
+    if (!segs) return -1;
+    const ms = timeSec * 1000;
+    // Words are sequential; linear scan is fine (≤ ~30 words/ayah).
+    for (let i = 0; i < segs.length; i++) {
+      const [from, to] = segs[i];
+      if (ms >= from && ms <= to) return i;
+    }
+    return -1;
+  };
 
   // Page numbers the hint target lives on (1-3 entries; usually 1).
   // Pre-warmed inline in rollNewAyah/revealNext; this effect is a
@@ -1002,11 +1112,11 @@ export default function QuizScreen({
         language={language}
         context="quiz"
       />
-      <VolumeOverlay
+      <AudioOverlay
         open={showVolume}
         onClose={() => setShowVolume(false)}
-        value={volume}
-        onChange={actions.setVolume}
+        settings={settings}
+        actions={actions}
         language={language}
       />
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
@@ -1036,8 +1146,12 @@ export default function QuizScreen({
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
-                setShowRangePicker((v) => !v);
-                if (!showRangePicker) setShowSettings(false);
+                const next = !showRangePicker;
+                setShowRangePicker(next);
+                if (next) {
+                  setShowSettings(false);
+                  setShowVolume(false);
+                }
               }}
               className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition-all duration-200 ${
                 showRangePicker
@@ -1063,8 +1177,9 @@ export default function QuizScreen({
             </button>
             <button
               onClick={() => {
-                setShowVolume((v) => !v);
-                if (!showVolume) {
+                const next = !showVolume;
+                setShowVolume(next);
+                if (next) {
                   setShowSettings(false);
                   setShowRangePicker(false);
                 }
@@ -1080,8 +1195,12 @@ export default function QuizScreen({
             </button>
             <button
               onClick={() => {
-                setShowSettings((v) => !v);
-                if (!showSettings) setShowRangePicker(false);
+                const next = !showSettings;
+                setShowSettings(next);
+                if (next) {
+                  setShowRangePicker(false);
+                  setShowVolume(false);
+                }
               }}
               className={`p-2 rounded-full border transition-all duration-200 ${
                 showSettings
@@ -1113,14 +1232,36 @@ export default function QuizScreen({
           </div>
         </div>
 
+        {/* Range picker overlay — absolute-positioned so opening it
+            doesn't push the reveal reel down. Anchors below the header
+            via the same `top` offset as the other panels and inherits
+            the screen's content-column max-width. */}
         {showRangePicker && (
-          <RangePopover
-            current={range}
-            onApply={onRangeChange}
-            onClose={() => setShowRangePicker(false)}
-            onCustomize={(juzs) => setCustomizing(juzs)}
-            language={language}
-          />
+          <>
+            <button
+              type="button"
+              onClick={() => setShowRangePicker(false)}
+              aria-label="Close range picker"
+              className="fixed inset-0 z-40 bg-black/0 animate-fade-in-soft"
+            />
+            <div
+              className="absolute z-50 inset-x-0 px-4 animate-fade-in pointer-events-none"
+              style={{
+                top: "max(4.5rem, calc(env(safe-area-inset-top) + 4rem))",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mx-auto w-full max-w-2xl pointer-events-auto">
+                <RangePopover
+                  current={range}
+                  onApply={onRangeChange}
+                  onClose={() => setShowRangePicker(false)}
+                  onCustomize={(juzs) => setCustomizing(juzs)}
+                  language={language}
+                />
+              </div>
+            </div>
+          </>
         )}
 
 
@@ -1175,12 +1316,34 @@ export default function QuizScreen({
                                 </span>
                               )}
                               <AyahAudioButton
-                                key={`${currentAyah.surah}:${currentAyah.ayah}`}
+                                key={`${currentAyah.surah}:${currentAyah.ayah}:${reciter}`}
                                 surah={currentAyah.surah}
                                 ayah={currentAyah.ayah}
                                 reciter={reciter}
                                 autoPlay={autoPlay}
                                 volume={volume}
+                                playbackSpeed={playbackSpeed}
+                                loop={loop}
+                                onTimeUpdate={(sec) => {
+                                  // Sticky behavior: only update on a
+                                  // positive match. Gaps between word
+                                  // segments leave the previous word
+                                  // highlighted so the slide animation
+                                  // looks continuous.
+                                  const idx = resolveWordIndex(
+                                    currentAyah.surah,
+                                    currentAyah.ayah,
+                                    sec
+                                  );
+                                  if (idx < 0) return;
+                                  const key = `${currentAyah.surah}:${currentAyah.ayah}`;
+                                  setHighlightedAyahKey((p) =>
+                                    p === key ? p : key
+                                  );
+                                  setHighlightedWordIdx((p) =>
+                                    p === idx ? p : idx
+                                  );
+                                }}
                                 ariaLabel={t("playAyah")}
                               />
                             </div>
@@ -1195,13 +1358,15 @@ export default function QuizScreen({
                                 </div>
                               )}
                               <AyahAudioButton
-                                key={`${currentAyah.surah}:${currentAyah.ayah}`}
+                                key={`${currentAyah.surah}:${currentAyah.ayah}:${reciter}`}
                                 surah={currentAyah.surah}
                                 ayah={currentAyah.ayah}
                                 reciter={reciter}
                                 size="lg"
                                 autoPlay={autoPlay}
                                 volume={volume}
+                                playbackSpeed={playbackSpeed}
+                                loop={loop}
                                 ariaLabel={t("playAyah")}
                               />
                               <div className="text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
@@ -1232,6 +1397,12 @@ export default function QuizScreen({
                                 ayah={currentAyah.ayah}
                                 showMarker={showAyahNumbers}
                                 tajweed={tajweed}
+                                highlightWordIndex={
+                                  highlightedAyahKey ===
+                                  `${currentAyah.surah}:${currentAyah.ayah}`
+                                    ? highlightedWordIdx
+                                    : undefined
+                                }
                                 className="font-quran leading-[2.4] text-neutral-800 dark:text-neutral-200 text-right"
                                 style={ayahStyle}
                               />
@@ -1300,6 +1471,23 @@ export default function QuizScreen({
                             reciter={reciter}
                             autoPlay={autoPlay && i === revealedAyahs.length - 1}
                             volume={volume}
+                            playbackSpeed={playbackSpeed}
+                            loop={loop}
+                            onTimeUpdate={(sec) => {
+                              const idx = resolveWordIndex(
+                                ra.surah,
+                                ra.ayah,
+                                sec
+                              );
+                              if (idx < 0) return;
+                              const key = `${ra.surah}:${ra.ayah}`;
+                              setHighlightedAyahKey((p) =>
+                                p === key ? p : key
+                              );
+                              setHighlightedWordIdx((p) =>
+                                p === idx ? p : idx
+                              );
+                            }}
                             ariaLabel={t("playAyah")}
                           />
                         </div>
@@ -1308,6 +1496,11 @@ export default function QuizScreen({
                           ayah={ra.ayah}
                           showMarker={showAyahNumbers}
                           tajweed={tajweed}
+                          highlightWordIndex={
+                            highlightedAyahKey === `${ra.surah}:${ra.ayah}`
+                              ? highlightedWordIdx
+                              : undefined
+                          }
                           className="font-quran leading-[2.2] text-neutral-800 dark:text-neutral-200 text-right"
                           style={ayahStyle}
                         />
@@ -1438,33 +1631,53 @@ export default function QuizScreen({
                 </div>
               )}
               <div className="flex gap-3 mb-3">
-                <button
-                  onClick={() => setHintMenuOpen((v) => !v)}
+                <HintButton
                   disabled={!hintTarget}
-                  className={`flex-1 py-3 font-medium rounded-xl border transition-all duration-200 active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none ${
-                    hintMenuOpen
-                      ? "bg-neutral-900 dark:bg-neutral-100 border-neutral-900 dark:border-neutral-100 text-white dark:text-neutral-900"
-                      : "bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 border-neutral-200 dark:border-neutral-800"
-                  }`}
-                  aria-haspopup="menu"
-                  aria-expanded={hintMenuOpen}
-                >
-                  {t("hint")}
-                </button>
+                  active={hintMenuOpen}
+                  label={t("hint")}
+                  trailing={<KbdHint label="H" />}
+                  onTap={() => setHintMenuOpen((v) => !v)}
+                  onLongPress={async () => {
+                    if (!hintTarget) return;
+                    // Cycle to the next hint type and fire it directly.
+                    const order: HintType[] = [
+                      "firstWord",
+                      "audio",
+                      "translation",
+                    ];
+                    const nextIdx =
+                      (order.indexOf(lastHintType) + 1) % order.length;
+                    const next = order[nextIdx];
+                    setLastHintType(next);
+                    setHintMenuOpen(false);
+                    if (next === "firstWord") {
+                      await ensureHintFontsReady();
+                      setHintFirstWordCount((c) => c + 1);
+                    } else if (next === "audio") {
+                      const step = hintAudioStep + 1;
+                      setHintAudioStep(step);
+                      void playAudioHint(step);
+                    } else {
+                      setHintTranslationStep((s) => s + 1);
+                    }
+                  }}
+                />
                 <button
                   onClick={revealNext}
                   disabled={atRangeEnd}
-                  className="flex-1 py-3 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 font-medium rounded-xl border border-neutral-200 dark:border-neutral-800 transition-all duration-200 active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none"
+                  className="flex-1 py-3 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 font-medium rounded-xl border border-neutral-200 dark:border-neutral-800 transition-all duration-200 active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none inline-flex items-center justify-center gap-2"
                 >
                   {promptOnly ? t("revealFirstAyah") : t("revealNextAyah")}
+                  <KbdHint label="Space" />
                 </button>
               </div>
 
               <button
                 onClick={rollNewAyah}
-                className="w-full py-3.5 bg-neutral-900 dark:bg-neutral-100 hover:bg-neutral-800 dark:hover:bg-neutral-200 text-white dark:text-neutral-900 font-medium rounded-xl transition-all duration-200 active:scale-[0.99]"
+                className="w-full py-3.5 bg-neutral-900 dark:bg-neutral-100 hover:bg-neutral-800 dark:hover:bg-neutral-200 text-white dark:text-neutral-900 font-medium rounded-xl transition-all duration-200 active:scale-[0.99] inline-flex items-center justify-center gap-2"
               >
                 {t("nextRandomAyah")}
+                <KbdHint label="N" inverted />
               </button>
             </div>
           </div>

@@ -17,6 +17,12 @@ interface Props {
   autoPlay?: boolean;
   /** Playback volume, 0–100. Applied at element creation and live-updated. */
   volume?: number;
+  /** Playback speed multiplier. 1.0 = normal. */
+  playbackSpeed?: number;
+  /** When true, looping plays the ayah repeatedly. */
+  loop?: boolean;
+  /** Called whenever the playback position changes (for word highlighting). */
+  onTimeUpdate?: (currentTimeSec: number) => void;
 }
 
 /**
@@ -52,11 +58,19 @@ export default function AyahAudioButton({
   size = "default",
   autoPlay = false,
   volume = 100,
+  playbackSpeed = 1,
+  loop = false,
+  onTimeUpdate,
 }: Props) {
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  // For surah-mode reciters: the time (in seconds) we should stop at.
+  // For surah-mode reciters: the start (seconds) and stop (seconds)
+  // for the current ayah within the surah-wide MP3. Used both by the
+  // timeupdate listener to halt at the ayah boundary and by the
+  // replay path to seek back to the ayah start when the user presses
+  // play after it has already ended.
+  const fromSecRef = useRef<number | null>(null);
   const stopAtRef = useRef<number | null>(null);
 
   const holderRef = useRef<{ stop: () => void }>({
@@ -84,6 +98,16 @@ export default function AyahAudioButton({
     if (a) a.volume = Math.max(0, Math.min(1, volume / 100));
   }, [volume]);
 
+  // Live-apply speed + loop too.
+  useEffect(() => {
+    const a = audioRef.current;
+    if (a) a.playbackRate = Math.max(0.25, Math.min(4, playbackSpeed));
+  }, [playbackSpeed]);
+  useEffect(() => {
+    const a = audioRef.current;
+    if (a) a.loop = loop;
+  }, [loop]);
+
   // Reciter changed mid-flight: tear down so the next click builds a
   // fresh element with the new URL / segment data.
   useEffect(() => {
@@ -92,6 +116,7 @@ export default function AyahAudioButton({
     a.pause();
     a.src = "";
     audioRef.current = null;
+    fromSecRef.current = null;
     stopAtRef.current = null;
     setPlaying(false);
     setLoading(false);
@@ -109,6 +134,11 @@ export default function AyahAudioButton({
     const a = new Audio(info.audioUrl(surah, ayah));
     a.preload = "none";
     a.volume = Math.max(0, Math.min(1, volume / 100));
+    a.playbackRate = Math.max(0.25, Math.min(4, playbackSpeed));
+    a.loop = loop;
+    if (onTimeUpdate) {
+      a.addEventListener("timeupdate", () => onTimeUpdate(a.currentTime));
+    }
     a.addEventListener("ended", () => {
       setPlaying(false);
       releaseAudioFocus(holderRef.current);
@@ -164,6 +194,7 @@ export default function AyahAudioButton({
     const [fromMs, toMs] = seg;
     const a = buildAyahAudio();
     a.src = info.audioUrl(surah, ayah);
+    fromSecRef.current = fromMs / 1000;
     stopAtRef.current = toMs / 1000;
     // Seek as soon as enough data has loaded; some browsers ignore
     // currentTime assignment before metadata is parsed.
@@ -177,9 +208,12 @@ export default function AyahAudioButton({
       if (stopAt != null && a.currentTime >= stopAt) {
         a.pause();
         // Manually fire "ended" semantics — we stopped mid-stream.
+        // Keep `stopAtRef` set so a subsequent play() still halts at
+        // the ayah boundary; the replay path will seek back to
+        // `fromSecRef` so the click actually replays this ayah
+        // instead of bleeding into the next.
         setPlaying(false);
         releaseAudioFocus(holderRef.current);
-        stopAtRef.current = null;
       }
     });
     audioRef.current = a;
@@ -219,8 +253,24 @@ export default function AyahAudioButton({
       return;
     }
     if (audioRef.current && !playing) {
+      const a = audioRef.current;
+      // Replay-from-end handling:
+      //   Ayah-mode: if the file has hit its natural end, rewind to 0.
+      //   Surah-mode: if currentTime is at or past the ayah's stop
+      //     boundary, seek back to the ayah's fromMs so the click
+      //     actually replays THIS ayah rather than playing the next
+      //     ayah from the same surah-wide MP3.
+      if (a.ended) {
+        a.currentTime = 0;
+      } else if (
+        stopAtRef.current !== null &&
+        fromSecRef.current !== null &&
+        a.currentTime >= stopAtRef.current
+      ) {
+        a.currentTime = fromSecRef.current;
+      }
       takeAudioFocus(holderRef.current);
-      audioRef.current.play().catch(() => {
+      a.play().catch(() => {
         setPlaying(false);
         releaseAudioFocus(holderRef.current);
       });
