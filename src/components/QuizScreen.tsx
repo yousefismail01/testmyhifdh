@@ -45,9 +45,8 @@ import {
   getReciter,
   loadReciterSegments,
   getCachedReciterSegments,
-  loadReciterWords,
-  getCachedReciterWords,
-  type WordTimings,
+  loadReciterWordsForSurah,
+  getCachedWordTimings,
 } from "../data/reciters";
 import { juzData } from "../data/quran-meta";
 import { ensurePageFont, getTajweedRuns } from "../data/quran-tajweed";
@@ -468,10 +467,10 @@ export default function QuizScreen({
     null
   );
   const [highlightedWordIdx, setHighlightedWordIdx] = useState<number>(-1);
-  // Word timings for the active reciter; lazily populated.
-  const [activeReciterWords, setActiveReciterWords] = useState<
-    Record<string, WordTimings>
-  >(() => getCachedReciterWords(reciter) ?? {});
+  // A version counter that bumps whenever word-timing data lands for
+  // a surah we care about — used to re-render so resolveWordIndex
+  // picks up the newly-loaded data.
+  const [wordsLoadVersion, setWordsLoadVersion] = useState(0);
   const [promptOnly, setPromptOnly] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
@@ -1013,40 +1012,50 @@ export default function QuizScreen({
     return advanceOne(lastShown);
   })();
 
-  // Lazy-fetch the per-word timing table for the active reciter the
-  // first time it's needed. Used to highlight the current word during
-  // playback. Files are ~250–500 KB gzipped each; only one reciter's
-  // table loads per session.
-  /* eslint-disable react-hooks/set-state-in-effect */
+  // Lazy-fetch per-surah word-timing slices for the active reciter as
+  // ayahs come into play. The "interesting" surahs are the prompt's
+  // and (if the user has revealed forward) any surahs reached by the
+  // reveal stream. We trigger fetches here and bump a version counter
+  // when they land so resolveWordIndex picks them up.
+  const interestingSurahs = useMemo(() => {
+    const s = new Set<number>();
+    if (currentAyah) s.add(currentAyah.surah);
+    for (const r of revealedAyahs) s.add(r.surah);
+    return Array.from(s);
+  }, [currentAyah, revealedAyahs]);
+  const interestingSurahsKey = interestingSurahs.join(",");
+
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
-    const cached = getCachedReciterWords(reciter);
-    if (cached) {
-      setActiveReciterWords(cached);
-      return;
-    }
     let cancelled = false;
-    void loadReciterWords(reciter).then((data) => {
-      if (!cancelled) setActiveReciterWords(data);
-    });
+    for (const s of interestingSurahs) {
+      // Skip if already cached (single-ayah probe is enough — the
+      // whole-surah slice loads atomically).
+      if (getCachedWordTimings(reciter, s, 1) !== null) continue;
+      void loadReciterWordsForSurah(reciter, s).then(() => {
+        if (!cancelled) setWordsLoadVersion((v) => v + 1);
+      });
+    }
     return () => {
       cancelled = true;
     };
-  }, [reciter]);
-  /* eslint-enable react-hooks/set-state-in-effect */
+  }, [reciter, interestingSurahsKey]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // Resolve the word index for an audio playback time (in seconds) on
-  // a given ayah. Returns -1 if no match. Surah-mode reciters share a
-  // single segment timeline per surah, so the time arrives unmodified;
-  // ayah-mode reciters' files start at 0 per ayah.
+  // a given ayah. Returns -1 if no match (no data yet, or `timeSec`
+  // falls in a gap between word segments).
   const resolveWordIndex = (
     surahNumber: number,
     ayahNumber: number,
     timeSec: number
   ): number => {
-    const segs = activeReciterWords[`${surahNumber}:${ayahNumber}`];
+    const segs = getCachedWordTimings(reciter, surahNumber, ayahNumber);
     if (!segs) return -1;
+    // wordsLoadVersion is read here so this closure invalidates each
+    // time fresh data lands and the next timeupdate finds it.
+    void wordsLoadVersion;
     const ms = timeSec * 1000;
-    // Words are sequential; linear scan is fine (≤ ~30 words/ayah).
     for (let i = 0; i < segs.length; i++) {
       const [from, to] = segs[i];
       if (ms >= from && ms <= to) return i;

@@ -32,12 +32,13 @@ export interface ReciterInfo {
   /** For surah-mode reciters, the path to the segment-timing JSON. */
   segmentsUrl?: string;
   /**
-   * Per-word timing JSON, used to highlight the active word during
-   * playback. Maps "surah:ayah" → `[[startMs, endMs], ...]`. Optional —
-   * Alafasy doesn't have word-level data, so highlighting is silently
-   * skipped for him.
+   * Base path for per-surah word-timing JSONs, e.g. `/data/words-husary`.
+   * Files are at `${wordsBasePath}/${surah}.json` and each contains
+   * `{ "surah:ayah": [[startMs, endMs], ...] }` for that surah only.
+   * Optional — Alafasy doesn't have word-level data, so highlighting
+   * is silently skipped for him.
    */
-  wordsUrl?: string;
+  wordsBasePath?: string;
 }
 
 const pad = (n: number, w: number) => String(n).padStart(w, "0");
@@ -49,7 +50,7 @@ export const reciters: ReciterInfo[] = [
     name: { en: "Husary", ar: "الحصري", ur: "حصری" },
     audioUrl: (s, a) =>
       `https://audio-cdn.tarteel.ai/quran/husary/${pad(s, 3)}${pad(a, 3)}.mp3`,
-    wordsUrl: "/data/words-husary.json",
+    wordsBasePath: "/data/words-husary",
   },
   {
     id: "alafasy",
@@ -69,7 +70,7 @@ export const reciters: ReciterInfo[] = [
         a,
         3
       )}.mp3`,
-    wordsUrl: "/data/words-minshawi.json",
+    wordsBasePath: "/data/words-minshawi",
   },
   {
     id: "maherAlMuaiqly",
@@ -80,7 +81,7 @@ export const reciters: ReciterInfo[] = [
         a,
         3
       )}.mp3`,
-    wordsUrl: "/data/words-maherAlMuaiqly.json",
+    wordsBasePath: "/data/words-maherAlMuaiqly",
   },
   {
     id: "abdulBasit",
@@ -92,7 +93,7 @@ export const reciters: ReciterInfo[] = [
         3
       )}.mp3`,
     segmentsUrl: "/data/segments-abdulBasit.json",
-    wordsUrl: "/data/words-abdulBasit.json",
+    wordsBasePath: "/data/words-abdulBasit",
   },
   {
     id: "yasserAlDosari",
@@ -104,7 +105,7 @@ export const reciters: ReciterInfo[] = [
         3
       )}.mp3`,
     segmentsUrl: "/data/segments-yasserAlDosari.json",
-    wordsUrl: "/data/words-yasserAlDosari.json",
+    wordsBasePath: "/data/words-yasserAlDosari",
   },
 ];
 
@@ -137,43 +138,61 @@ export function getCachedReciterSegments(
   return segmentCache.get(id) ?? null;
 }
 
-const wordsCache = new Map<ReciterId, WordMap>();
-const wordsLoading = new Map<ReciterId, Promise<WordMap>>();
+// Per-(reciter, surah) cache. Tens of KB per surah; a typical session
+// touches a few surahs, so the working set stays tiny compared to
+// loading the entire reciter's word data up-front.
+const wordsCache = new Map<string, WordMap>();
+const wordsLoading = new Map<string, Promise<WordMap>>();
+
+const wordsKey = (id: ReciterId, surah: number) => `${id}:${surah}`;
 
 /**
- * Lazy-load the per-word timing table for the given reciter. Returns
- * an empty map if the reciter has no published word-segment data
+ * Lazy-load the word-timing table for a single surah of a reciter.
+ * Returns an empty map if the reciter has no published word data
  * (Alafasy) or the fetch fails — callers should just skip highlighting
- * in that case. Files are ~250–500 KB gzipped each; fetched on first
- * audio play and cached for the rest of the session.
+ * in that case. Files are typically 3–10 KB gzipped per surah.
  */
-export async function loadReciterWords(id: ReciterId): Promise<WordMap> {
-  const cached = wordsCache.get(id);
+export async function loadReciterWordsForSurah(
+  id: ReciterId,
+  surah: number
+): Promise<WordMap> {
+  const key = wordsKey(id, surah);
+  const cached = wordsCache.get(key);
   if (cached) return cached;
-  const inflight = wordsLoading.get(id);
+  const inflight = wordsLoading.get(key);
   if (inflight) return inflight;
   const info = getReciter(id);
-  if (!info.wordsUrl) return {};
+  if (!info.wordsBasePath) return {};
   const p = (async () => {
     try {
-      const res = await fetch(info.wordsUrl!);
+      const res = await fetch(`${info.wordsBasePath}/${surah}.json`);
       if (!res.ok) throw new Error(String(res.status));
       const data = (await res.json()) as WordMap;
-      wordsCache.set(id, data);
+      wordsCache.set(key, data);
       return data;
     } catch {
-      wordsCache.set(id, {});
+      wordsCache.set(key, {});
       return {};
     } finally {
-      wordsLoading.delete(id);
+      wordsLoading.delete(key);
     }
   })();
-  wordsLoading.set(id, p);
+  wordsLoading.set(key, p);
   return p;
 }
 
-export function getCachedReciterWords(id: ReciterId): WordMap | null {
-  return wordsCache.get(id) ?? null;
+/**
+ * Synchronous read of the word-timing cache for a single ayah.
+ * Returns the per-word `[startMs, endMs]` array, or null when the
+ * surah's slice hasn't been fetched yet.
+ */
+export function getCachedWordTimings(
+  id: ReciterId,
+  surah: number,
+  ayah: number
+): WordTimings | null {
+  const map = wordsCache.get(wordsKey(id, surah));
+  return map?.[`${surah}:${ayah}`] ?? null;
 }
 
 /**

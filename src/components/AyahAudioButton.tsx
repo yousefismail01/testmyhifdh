@@ -73,6 +73,10 @@ export default function AyahAudioButton({
   // replay path to seek back to the ayah start when the user presses
   // play after it has already ended.
   const fromSecRef = useRef<number | null>(null);
+  // True only during the brief seek+play of a surah-mode loop-back.
+  // The default pause-event cleanup checks this and skips
+  // releaseAudioFocus so the looping audio retains focus.
+  const loopingRef = useRef(false);
   const stopAtRef = useRef<number | null>(null);
 
   const holderRef = useRef<{ stop: () => void }>({
@@ -108,8 +112,13 @@ export default function AyahAudioButton({
   }, [playbackSpeed]);
   useEffect(() => {
     const a = audioRef.current;
-    if (a) a.loop = loop;
-  }, [loop]);
+    if (!a) return;
+    // Same rationale as buildAyahAudio: surah-mode handles looping
+    // manually so we don't let the native attribute replay the
+    // whole surah file.
+    const info = getReciter(reciter);
+    a.loop = info.mode === "ayah" ? loop : false;
+  }, [loop, reciter]);
 
   // Reciter changed mid-flight: tear down so the next click builds a
   // fresh element with the new URL / segment data.
@@ -146,7 +155,12 @@ export default function AyahAudioButton({
     a.crossOrigin = "anonymous";
     a.volume = Math.max(0, Math.min(1, volume / 100));
     a.playbackRate = Math.max(0.25, Math.min(4, playbackSpeed));
-    a.loop = loop;
+    // Native `loop` only for ayah-mode (one MP3 per verse). For
+    // surah-mode the file contains every ayah of the surah —
+    // native looping would replay the *whole surah*, not the
+    // target ayah. Looping there is handled manually in the surah-
+    // mode timeupdate listener by seeking back to fromSec.
+    a.loop = info.mode === "ayah" ? loop : false;
     // Hide it visually but keep it in the document tree.
     a.style.position = "absolute";
     a.style.width = "1px";
@@ -155,13 +169,39 @@ export default function AyahAudioButton({
     a.style.pointerEvents = "none";
     document.body.appendChild(a);
     if (onTimeUpdate) {
-      a.addEventListener("timeupdate", () => onTimeUpdate(a.currentTime));
+      // Throttle to ~10 Hz via rAF. The browser fires `timeupdate`
+      // at a higher rate (4–60 Hz, varies); for word highlighting we
+      // only need ~10 measurements/sec to look smooth — anything
+      // more is wasted React renders + DOM measures.
+      let scheduled = false;
+      let lastDispatchMs = 0;
+      const dispatch = () => {
+        scheduled = false;
+        const now = performance.now();
+        if (now - lastDispatchMs < 90) return; // ~11 Hz cap
+        lastDispatchMs = now;
+        onTimeUpdate(a.currentTime);
+      };
+      a.addEventListener("timeupdate", () => {
+        if (scheduled) return;
+        scheduled = true;
+        requestAnimationFrame(dispatch);
+      });
     }
     a.addEventListener("ended", () => {
+      // Surah-mode hands its own ended handling in applySegments
+      // (loop-back vs cleanup depending on the `loop` setting). We
+      // skip the default cleanup here so the loop path can take over
+      // without a paused-state flicker.
+      if (info.mode === "surah") return;
       setPlaying(false);
       releaseAudioFocus(holderRef.current);
     });
     a.addEventListener("pause", () => {
+      // Mid-loop in surah-mode: the audio fired pause because it
+      // naturally ended, but we're about to seek+play to keep the
+      // ayah looping. Skip cleanup so focus and play-state stay put.
+      if (loopingRef.current) return;
       if (!a.ended) setPlaying(false);
       releaseAudioFocus(holderRef.current);
     });
@@ -234,13 +274,53 @@ export default function AyahAudioButton({
       }
       a.addEventListener("timeupdate", () => {
         const stopAt = stopAtRef.current;
-        if (stopAt != null && a.currentTime >= stopAt) {
-          a.pause();
-          // Keep stopAtRef set so the next play() still halts at the
-          // ayah boundary; the replay path will seek back to fromSec.
+        const fromSec = fromSecRef.current;
+        if (stopAt == null) return;
+        if (a.currentTime < stopAt) return;
+        if (loop && fromSec != null) {
+          // Looping in surah-mode: rewind to the ayah's start so the
+          // same ayah replays. Setting currentTime is enough — the
+          // element is still playing.
+          a.currentTime = fromSec;
+          return;
+        }
+        a.pause();
+        // Keep stopAtRef set so the next play() still halts at the
+        // ayah boundary; the replay path will seek back to fromSec.
+        setPlaying(false);
+        releaseAudioFocus(holderRef.current);
+      });
+      // Surah-mode `ended` handler: if the audio file naturally ended
+      // (last ayah of the surah, timeupdate didn't fire in time), do
+      // the loop-back or final cleanup here. Without this, with the
+      // native `loop` attribute disabled (we have to disable it so
+      // the whole surah doesn't replay), the audio would just stop
+      // even when the user has loop turned on.
+      a.addEventListener("ended", () => {
+        const fromSec = fromSecRef.current;
+        if (!loop || fromSec == null) {
           setPlaying(false);
           releaseAudioFocus(holderRef.current);
+          return;
         }
+        loopingRef.current = true;
+        takeAudioFocus(holderRef.current);
+        try {
+          a.currentTime = fromSec;
+        } catch {
+          /* setting currentTime can throw if the media is in a
+             bad state — fall through to play() which will fail
+             gracefully */
+        }
+        a.play()
+          .catch((err) => {
+            console.warn("surah-mode loop replay failed", err);
+            setPlaying(false);
+            releaseAudioFocus(holderRef.current);
+          })
+          .finally(() => {
+            loopingRef.current = false;
+          });
       });
     };
 

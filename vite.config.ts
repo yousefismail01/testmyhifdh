@@ -27,10 +27,13 @@ export default defineConfig({
         // 604 QPC v4 page fonts or the tajweed JSON: that's >10 MB of
         // data the user might never need. Both have runtime caching
         // rules instead, so they cache lazily on first use.
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2,ico}'],
+        // Precache only the app shell + small always-needed assets.
+        // Everything in /data/ and /fonts/qpc-v4/ caches lazily on
+        // first use through the runtimeCaching rules below.
+        globPatterns: ['**/*.{js,css,html,svg,png,ico}', 'fonts/UthmanicHafs1Ver18.woff2'],
         globIgnores: [
           '**/fonts/qpc-v4/**',
-          '**/data/ayahs-tajweed.json',
+          '**/data/**',
         ],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         // SPA fallback so deep links work offline.
@@ -81,26 +84,33 @@ export default defineConfig({
             },
           },
           {
-            // Per-reciter word-by-word timing tables (~270–500 KB
-            // gzipped each). Used for word highlighting during audio.
-            urlPattern: /\/data\/words-.*\.json$/,
+            // Per-(reciter, surah) word-timing slices in
+            // /data/words-{slug}/{surah}.json. ~3–10 KB gzipped each;
+            // immutable per surah.
+            urlPattern: /\/data\/words-.+\/\d+\.json$/,
             handler: 'CacheFirst',
             options: {
               cacheName: 'reciter-words',
               expiration: {
-                maxEntries: 20,
+                maxEntries: 1000,
                 maxAgeSeconds: 60 * 60 * 24 * 90,
               },
               cacheableResponse: { statuses: [0, 200] },
             },
           },
           {
-            // Translation table (~286 KB gzipped). Stale-while-revalidate
-            // so a returning user gets the cached copy instantly.
-            urlPattern: /\/data\/translation-.*\.json$/,
-            handler: 'StaleWhileRevalidate',
+            // Per-surah translation slices in /data/translation-en-sahih/{surah}.json.
+            // Tiny files, ~3 KB gzipped each — typical session touches a
+            // handful of surahs. CacheFirst is fine since the content
+            // for a given surah is immutable.
+            urlPattern: /\/data\/translation-.*\/\d+\.json$/,
+            handler: 'CacheFirst',
             options: {
               cacheName: 'translations',
+              expiration: {
+                maxEntries: 300,
+                maxAgeSeconds: 60 * 60 * 24 * 90,
+              },
               cacheableResponse: { statuses: [0, 200] },
             },
           },

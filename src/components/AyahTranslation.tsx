@@ -1,5 +1,5 @@
 import { getTranslation } from "../data/translations-en";
-import { useTranslationReady } from "../hooks/useTranslationReady";
+import { useTranslationReadyForSurah } from "../hooks/useTranslationReady";
 
 interface Props {
   surah: number;
@@ -8,15 +8,14 @@ interface Props {
 
 /**
  * Renders the English translation for an ayah as a muted hint line.
- * Lazy-fetches the translation table on first mount; while it's
+ * Lazy-fetches the surah's translation slice on first mount; while it's
  * loading, renders nothing rather than flashing a placeholder.
  *
  * Brackets in the Sahih International text (e.g. "[All] praise…")
- * indicate inserted-for-clarity words and read fine inline — no
- * processing needed.
+ * indicate inserted-for-clarity words and read fine inline.
  */
 export default function AyahTranslation({ surah, ayah }: Props) {
-  const ready = useTranslationReady();
+  const ready = useTranslationReadyForSurah(surah);
   if (!ready) return null;
   const text = getTranslation(surah, ayah);
   if (!text) return null;

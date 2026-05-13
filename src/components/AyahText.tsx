@@ -175,60 +175,90 @@ function HighlightedRender({
     return acc;
   }, [charRanges]);
 
+  // Cache per-word rects so we don't repeatedly call
+  // getBoundingClientRect on every timeupdate. Cleared on resize or
+  // when the font finishes loading (both can shift glyph metrics).
+  const rectsCacheRef = useRef<Map<number, HLRect>>(new Map());
+
+  // Measure-on-demand: returns the rect for a word index, computing
+  // (and caching) it the first time, returning the cached value
+  // thereafter.
+  const measureRect = (wordIdx: number): HLRect | null => {
+    const root = containerRef.current;
+    if (!root) return null;
+    const cached = rectsCacheRef.current.get(wordIdx);
+    if (cached) return cached;
+    let runIdx = -1;
+    let localIdx = -1;
+    for (let i = 0; i < runStartIdx.length; i++) {
+      const start = runStartIdx[i];
+      const end =
+        i + 1 < runStartIdx.length ? runStartIdx[i + 1] : Infinity;
+      if (wordIdx >= start && wordIdx < end) {
+        runIdx = i;
+        localIdx = wordIdx - start;
+        break;
+      }
+    }
+    if (runIdx < 0) return null;
+    const span = runRefs.current[runIdx];
+    if (!span || !span.firstChild) return null;
+    const textNode = span.firstChild;
+    if (textNode.nodeType !== Node.TEXT_NODE) return null;
+    const cr = charRanges[runIdx][localIdx];
+    if (!cr) return null;
+    try {
+      const range = document.createRange();
+      range.setStart(textNode, cr[0]);
+      range.setEnd(textNode, cr[1]);
+      const rect = range.getBoundingClientRect();
+      const rootRect = root.getBoundingClientRect();
+      const result: HLRect = {
+        top: rect.top - rootRect.top,
+        left: rect.left - rootRect.left,
+        width: rect.width,
+        height: rect.height,
+      };
+      range.detach?.();
+      rectsCacheRef.current.set(wordIdx, result);
+      return result;
+    } catch {
+      return null;
+    }
+  };
+
+  /* eslint-disable react-hooks/exhaustive-deps */
+  /* eslint-disable react-hooks/set-state-in-effect */
   useLayoutEffect(() => {
+    const r = measureRect(highlightWordIndex);
+    if (r) setHl(r);
+  }, [highlightWordIndex, runs]);
+  /* eslint-enable react-hooks/exhaustive-deps */
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Bust the rect cache on viewport or font-metric changes; the
+  // rects need re-measuring after either.
+  useEffect(() => {
     const root = containerRef.current;
     if (!root) return;
-    const measure = () => {
-      // Find which run owns the active word.
-      let runIdx = -1;
-      let localIdx = -1;
-      for (let i = 0; i < runStartIdx.length; i++) {
-        const start = runStartIdx[i];
-        const end =
-          i + 1 < runStartIdx.length ? runStartIdx[i + 1] : Infinity;
-        if (highlightWordIndex >= start && highlightWordIndex < end) {
-          runIdx = i;
-          localIdx = highlightWordIndex - start;
-          break;
-        }
-      }
-      if (runIdx < 0) return;
-      const span = runRefs.current[runIdx];
-      if (!span || !span.firstChild) return;
-      const textNode = span.firstChild;
-      if (textNode.nodeType !== Node.TEXT_NODE) return;
-      const cr = charRanges[runIdx][localIdx];
-      if (!cr) return;
-      try {
-        const range = document.createRange();
-        range.setStart(textNode, cr[0]);
-        range.setEnd(textNode, cr[1]);
-        const rect = range.getBoundingClientRect();
-        const rootRect = root.getBoundingClientRect();
-        setHl({
-          top: rect.top - rootRect.top,
-          left: rect.left - rootRect.left,
-          width: rect.width,
-          height: rect.height,
-        });
-        range.detach?.();
-      } catch {
-        /* range API unavailable / text node mutated mid-measure */
-      }
+    const invalidate = () => {
+      rectsCacheRef.current.clear();
+      const r = measureRect(highlightWordIndex);
+      if (r) setHl(r);
     };
-    measure();
-    window.addEventListener("resize", measure);
+    window.addEventListener("resize", invalidate);
     let cancelled = false;
     if ("fonts" in document) {
       document.fonts.ready.then(() => {
-        if (!cancelled) measure();
+        if (!cancelled) invalidate();
       });
     }
     return () => {
       cancelled = true;
-      window.removeEventListener("resize", measure);
+      window.removeEventListener("resize", invalidate);
     };
-  }, [highlightWordIndex, runs, runStartIdx, charRanges]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runs]);
 
   return (
     <p

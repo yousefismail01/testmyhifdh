@@ -1,15 +1,16 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import RangeSelector, { type SelectedRange } from "./components/RangeSelector";
-import QuizScreen from "./components/QuizScreen";
+// QuizScreen is the heavy half of the app (AyahText, audio, hint
+// machinery, customizer, …). Code-split so the home screen first paint
+// doesn't pay for it.
+const QuizScreen = lazy(() => import("./components/QuizScreen"));
 import { usePersistedState } from "./hooks/usePersistedState";
 import type { Language } from "./i18n/translations";
 import { isRTL } from "./i18n/translations";
 import { loadTajweed } from "./data/quran-tajweed";
-import { loadTranslation } from "./data/translations-en";
 import { loadSimilar } from "./data/similar-ayahs";
 import { installAudioUnlock } from "./lib/audio-unlock";
 import {
-  loadReciterWords,
   loadReciterSegments,
   getReciter,
   type ReciterId,
@@ -217,13 +218,9 @@ export default function App() {
     installAudioUnlock();
   }, []);
 
-  // Pre-warm the translation file only if the user already has the
-  // "show translation" setting on. Otherwise it'd be ~290 KB gzipped
-  // of bandwidth they may never use; the file lazy-loads from the
-  // AyahTranslation component the moment they enable the toggle.
-  useEffect(() => {
-    if (showTranslation) void loadTranslation();
-  }, [showTranslation]);
+  // Translation is now split by surah and loaded on demand from
+  // AyahTranslation when the user is on a surah and has the toggle
+  // on — no global pre-warm needed.
 
   // Similar-ayahs is small (~24 KB gzipped). Pre-warm when enabled,
   // same pattern.
@@ -231,13 +228,13 @@ export default function App() {
     if (showSimilarPhrases) void loadSimilar();
   }, [showSimilarPhrases]);
 
-  // Pre-warm the active reciter's word-timing and (for surah-mode
-  // reciters) segment tables. The segment fetch is critical on iOS
-  // Safari: startSurahMode reads from the cache *synchronously* to
-  // keep the audio.play() call inside the user gesture — an awaited
-  // promise after the click loses the gesture and silently rejects.
+  // Pre-warm the segment table for surah-mode reciters. Critical on
+  // iOS Safari: startSurahMode reads from the cache *synchronously*
+  // to keep the audio.play() call inside the user gesture — an
+  // awaited promise after the click loses the gesture and silently
+  // rejects. Word-timing data is now per-surah and loaded on demand
+  // by QuizScreen as ayahs come into play.
   useEffect(() => {
-    void loadReciterWords(reciter);
     if (getReciter(reciter).mode === "surah") {
       void loadReciterSegments(reciter);
     }
@@ -252,16 +249,24 @@ export default function App() {
   return (
     <div className="min-h-screen bg-white dark:bg-neutral-950">
       {range ? (
-        <QuizScreen
-          range={range}
-          onBack={() => setRange(null)}
-          onRangeChange={(r) => {
-            setRange(r);
-            setLastRange(r);
-          }}
-          settings={settings}
-          actions={actions}
-        />
+        <Suspense
+          fallback={
+            <div className="min-h-screen flex items-center justify-center">
+              <div className="w-7 h-7 border-2 border-neutral-300 dark:border-neutral-700 border-t-neutral-900 rounded-full animate-spin" />
+            </div>
+          }
+        >
+          <QuizScreen
+            range={range}
+            onBack={() => setRange(null)}
+            onRangeChange={(r) => {
+              setRange(r);
+              setLastRange(r);
+            }}
+            settings={settings}
+            actions={actions}
+          />
+        </Suspense>
       ) : (
         <RangeSelector
           initialRange={lastRange}

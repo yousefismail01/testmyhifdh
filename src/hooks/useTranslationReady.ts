@@ -1,23 +1,33 @@
 import { useEffect, useState } from "react";
 import {
-  isTranslationReady,
-  loadTranslation,
+  isTranslationReadyForSurah,
+  loadTranslationForSurah,
   subscribeTranslationReady,
 } from "../data/translations-en";
 
 /**
- * Returns `true` once the English translation JSON has loaded. Kicks
- * off the fetch on first mount; subsequent mounts share the same
- * in-flight promise (same pattern as useTajweedReady).
+ * Returns `true` once the translation file for the given surah has
+ * loaded. Triggers the per-surah fetch on first mount. Re-subscribes
+ * when the surah changes.
  */
-export function useTranslationReady(): boolean {
-  const [ready, setReady] = useState<boolean>(isTranslationReady);
+export function useTranslationReadyForSurah(surah: number): boolean {
+  const [ready, setReady] = useState<boolean>(() =>
+    isTranslationReadyForSurah(surah)
+  );
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    if (isTranslationReady()) return;
-    void loadTranslation();
-    return subscribeTranslationReady(() => setReady(true));
-  }, []);
+    if (isTranslationReadyForSurah(surah)) {
+      setReady(true);
+      return;
+    }
+    setReady(false);
+    void loadTranslationForSurah(surah);
+    return subscribeTranslationReady(() => {
+      if (isTranslationReadyForSurah(surah)) setReady(true);
+    });
+  }, [surah]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   return ready;
 }

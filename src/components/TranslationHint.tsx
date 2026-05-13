@@ -1,5 +1,5 @@
 import { getTranslation } from "../data/translations-en";
-import { useTranslationReady } from "../hooks/useTranslationReady";
+import { useTranslationReadyForSurah } from "../hooks/useTranslationReady";
 
 interface Props {
   surah: number;
@@ -24,7 +24,7 @@ export default function TranslationHint({
   wordsPerStep,
   className = "",
 }: Props) {
-  const ready = useTranslationReady();
+  const ready = useTranslationReadyForSurah(surah);
   if (!ready || step <= 0) return null;
   const text = getTranslation(surah, ayah);
   if (!text) return null;
