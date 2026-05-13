@@ -20,7 +20,7 @@ const en = {
   fromPage: "From Page",
   toPage: "To Page",
 
-  rangeFooter: "Surahs are weighted equally — short surahs roll as often as long ones",
+  rangeFooter: "Every ayah in your range has an equal chance of being rolled",
 
   revealFirstAyah: "Reveal First Ayah",
   revealNextAyah: "Reveal Next Ayah",
@@ -74,8 +74,7 @@ const ar: typeof en = {
   fromPage: "من صفحة",
   toPage: "إلى صفحة",
 
-  rangeFooter:
-    "تُعطى السور نفس الاحتمال — السور القصيرة تُطرح بنفس وتيرة الطويلة",
+  rangeFooter: "لكل آية في المدى احتمال متساوٍ للظهور",
 
   revealFirstAyah: "اكشف الآية الأولى",
   revealNextAyah: "اكشف الآية التالية",
@@ -129,8 +128,7 @@ const ur: typeof en = {
   fromPage: "سے صفحہ",
   toPage: "تک صفحہ",
 
-  rangeFooter:
-    "تمام سورتوں کا برابر امکان — چھوٹی سورتیں بھی بڑی سورتوں جتنی بار آتی ہیں",
+  rangeFooter: "حد کی ہر آیت کے رولنگ کا برابر امکان ہے",
 
   revealFirstAyah: "پہلی آیت دکھائیں",
   revealNextAyah: "اگلی آیت دکھائیں",

@@ -7,7 +7,7 @@ Live at **[testmyhifdh.com](https://testmyhifdh.com)**.
 ## Features
 
 - **Three ways to scope the test**: by juz, by surah range, or by page range. In surah mode you can narrow the bounds to specific ayahs within the first and last surah (e.g. *Al-Baqarah 50 – Aal-Imran 100*).
-- **Surah-uniform weighting**: every surah in your range is rolled with equal probability so short surahs don't get drowned out by long ones. Within a surah, ayahs are uniform.
+- **Per-ayah uniform weighting**: every ayah in your selected range has the same probability of being rolled, so longer surahs, pages, and ayah subranges proportionally show up more often.
 - **Final ayahs are never the prompt**: the last ayah of any surah is excluded from the random roll. If you got rolled the ending there'd be nothing to recite. You can still reveal it.
 - **Vertical reveal reel** with a soft top-fade mask: revealed ayahs flow through a fixed-height region; the page itself never scrolls.
 - **Calligraphic Bismillah header** when reveals cross into a new surah, shown once as a ligature (﷽) above the next ayah card — never duplicated inline.

@@ -206,15 +206,13 @@ export function getSurahRange(from: number, to: number) {
   };
 }
 
+/**
+ * Picks an ayah from the pool with uniform probability per ayah. Every
+ * candidate ayah has the same chance of being rolled, so longer surahs,
+ * pages, and surah-ayah subranges proportionally show up more often —
+ * the range's actual ayah count drives the distribution, not the surah
+ * count.
+ */
 export function pickWeightedRandomAyah(ayahs: AyahReference[]): AyahReference {
-  const surahGroups = new Map<number, AyahReference[]>();
-  for (const a of ayahs) {
-    if (!surahGroups.has(a.surah)) surahGroups.set(a.surah, []);
-    surahGroups.get(a.surah)!.push(a);
-  }
-
-  const surahKeys = Array.from(surahGroups.keys());
-  const randomSurah = surahKeys[Math.floor(Math.random() * surahKeys.length)];
-  const group = surahGroups.get(randomSurah)!;
-  return group[Math.floor(Math.random() * group.length)];
+  return ayahs[Math.floor(Math.random() * ayahs.length)];
 }
