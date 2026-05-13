@@ -11,6 +11,7 @@ interface Props {
    *  the last run so the verse ends cleanly. */
   showMarker: boolean;
   className?: string;
+  style?: React.CSSProperties;
   dir?: "rtl" | "ltr";
 }
 
@@ -25,6 +26,7 @@ export default function AyahText({
   tajweed,
   showMarker,
   className,
+  style,
   dir = "rtl",
 }: Props) {
   const runs = useMemo(() => {
@@ -52,7 +54,7 @@ export default function AyahText({
     .join(" ");
 
   return (
-    <p className={classes} dir={dir}>
+    <p className={classes} style={style} dir={dir}>
       {runs.map((run, i) => (
         <span key={i} style={{ fontFamily: `'qpc-v4-p${run.p}'` }}>
           {run.t}

@@ -4,7 +4,11 @@ import QuizScreen from "./components/QuizScreen";
 import { usePersistedState } from "./hooks/usePersistedState";
 
 export type Theme = "light" | "dark";
-export type FontSize = "sm" | "md" | "lg" | "xl";
+/** Quran-text font size in CSS pixels. 16–48 inclusive, integer steps. */
+export type FontSize = number;
+export const FONT_SIZE_MIN = 16;
+export const FONT_SIZE_MAX = 48;
+export const FONT_SIZE_DEFAULT = 26;
 
 export interface Settings {
   theme: Theme;
@@ -32,7 +36,7 @@ export default function App() {
   const [theme, setTheme] = usePersistedState<Theme>("tmh.theme", "light");
   const [fontSize, setFontSize] = usePersistedState<FontSize>(
     "tmh.fontSize",
-    "md"
+    FONT_SIZE_DEFAULT
   );
   const [hideSurahName, setHideSurahName] = usePersistedState(
     "tmh.hideSurahName",

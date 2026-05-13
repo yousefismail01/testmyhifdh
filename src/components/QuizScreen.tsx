@@ -15,7 +15,7 @@ import {
   type AyahReference,
 } from "../data/quran-meta";
 import type { SelectedRange } from "./RangeSelector";
-import type { Settings, SettingsActions, FontSize } from "../App";
+import type { Settings, SettingsActions } from "../App";
 import SettingsPanel from "./SettingsPanel";
 import AyahText from "./AyahText";
 import { juzData } from "../data/quran-meta";
@@ -274,15 +274,6 @@ function RangePopover({
   );
 }
 
-const FONT_SIZES: Record<
-  FontSize,
-  { current: string; revealed: string; bismillah: string }
-> = {
-  sm: { current: "text-xl", revealed: "text-xl", bismillah: "text-xl" },
-  md: { current: "text-2xl", revealed: "text-2xl", bismillah: "text-2xl" },
-  lg: { current: "text-3xl", revealed: "text-3xl", bismillah: "text-3xl" },
-  xl: { current: "text-4xl", revealed: "text-4xl", bismillah: "text-4xl" },
-};
 
 interface RevealedAyah {
   surah: number;
@@ -309,7 +300,12 @@ export default function QuizScreen({
   const [loading, setLoading] = useState(true);
   const lastRevealedRef = useRef<AyahReference | null>(null);
 
-  const sizes = FONT_SIZES[fontSize];
+  const ayahStyle: React.CSSProperties = { fontSize: `${fontSize}px` };
+  // Bismillah ligature is slightly larger to balance visual weight with the
+  // surrounding ayah text but stays in proportion.
+  const bismillahStyle: React.CSSProperties = {
+    fontSize: `${Math.round(fontSize * 1.05)}px`,
+  };
   const [showSettings, setShowSettings] = useState(false);
   const [showRangePicker, setShowRangePicker] = useState(false);
   const [promptOnly, setPromptOnly] = useState(false);
@@ -683,7 +679,8 @@ export default function QuizScreen({
                         {hasBismillahHeader && (
                           <div className="text-center my-4 animate-fade-in-soft">
                             <span
-                              className={`bismillah-glyph ${sizes.bismillah} text-neutral-700 dark:text-neutral-200`}
+                              className="bismillah-glyph text-neutral-700 dark:text-neutral-200"
+                              style={bismillahStyle}
                               dir="rtl"
                             >
                               {BISMILLAH_DISPLAY}
@@ -726,7 +723,8 @@ export default function QuizScreen({
                               ayah={currentAyah.ayah}
                               showMarker={showAyahNumbers}
                               tajweed={tajweed}
-                              className={`font-quran ${sizes.current} leading-[2.4] text-neutral-800 dark:text-neutral-200 text-right`}
+                              className="font-quran leading-[2.4] text-neutral-800 dark:text-neutral-200 text-right"
+                              style={ayahStyle}
                             />
                           )}
                         </div>
@@ -750,7 +748,8 @@ export default function QuizScreen({
                             </div>
                           )}
                           <span
-                            className={`bismillah-glyph ${sizes.revealed} text-neutral-700 dark:text-neutral-200`}
+                            className="bismillah-glyph text-neutral-700 dark:text-neutral-200"
+                            style={bismillahStyle}
                             dir="rtl"
                           >
                             {BISMILLAH_DISPLAY}
@@ -778,7 +777,8 @@ export default function QuizScreen({
                           ayah={ra.ayah}
                           showMarker={showAyahNumbers}
                           tajweed={tajweed}
-                          className={`font-quran ${sizes.revealed} leading-[2.2] text-neutral-800 dark:text-neutral-200 text-right`}
+                          className="font-quran leading-[2.2] text-neutral-800 dark:text-neutral-200 text-right"
+                          style={ayahStyle}
                         />
                       </div>
                     </Fragment>

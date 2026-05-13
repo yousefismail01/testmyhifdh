@@ -1,4 +1,5 @@
-import type { Settings, SettingsActions, Theme, FontSize } from "../App";
+import type { Settings, SettingsActions, Theme } from "../App";
+import { FONT_SIZE_MAX, FONT_SIZE_MIN } from "../App";
 
 interface Props {
   settings: Settings;
@@ -81,23 +82,27 @@ export default function SettingsPanel({ settings, actions, compact }: Props) {
       )}
 
       <div className="pt-1">
-        <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200 mb-2">
-          Text size
+        <div className="flex items-baseline justify-between mb-2">
+          <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
+            Text size
+          </div>
+          <div className="font-quran tabular-nums text-xs text-neutral-500 dark:text-neutral-400">
+            {settings.fontSize}px
+          </div>
         </div>
-        <div className="flex gap-1 bg-neutral-50 dark:bg-neutral-800 rounded-xl p-1">
-          {(["sm", "md", "lg", "xl"] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => actions.setFontSize(s as FontSize)}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
-                settings.fontSize === s
-                  ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm"
-                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
-              }`}
-            >
-              {s.toUpperCase()}
-            </button>
-          ))}
+        <input
+          type="range"
+          min={FONT_SIZE_MIN}
+          max={FONT_SIZE_MAX}
+          step={1}
+          value={settings.fontSize}
+          onChange={(e) => actions.setFontSize(Number(e.target.value))}
+          aria-label="Quran text size"
+          className="w-full accent-neutral-900 dark:accent-neutral-100"
+        />
+        <div className="flex justify-between text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mt-1">
+          <span>Small</span>
+          <span>Large</span>
         </div>
       </div>
 
