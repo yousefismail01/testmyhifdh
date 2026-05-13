@@ -34,6 +34,10 @@ export interface SettingsActions {
 
 export default function App() {
   const [range, setRange] = useState<SelectedRange | null>(null);
+  // The last range applied via Begin/Apply. Survives the quiz→home
+  // transition so RangeSelector can re-seed its picker state and the
+  // user doesn't have to reselect their juzs after going back.
+  const [lastRange, setLastRange] = useState<SelectedRange | null>(null);
 
   const [theme, setTheme] = usePersistedState<Theme>("tmh.theme", "light");
   const [fontSize, setFontSize] = usePersistedState<FontSize>(
@@ -114,13 +118,20 @@ export default function App() {
         <QuizScreen
           range={range}
           onBack={() => setRange(null)}
-          onRangeChange={setRange}
+          onRangeChange={(r) => {
+            setRange(r);
+            setLastRange(r);
+          }}
           settings={settings}
           actions={actions}
         />
       ) : (
         <RangeSelector
-          onStart={setRange}
+          initialRange={lastRange}
+          onStart={(r) => {
+            setRange(r);
+            setLastRange(r);
+          }}
           settings={settings}
           actions={actions}
         />

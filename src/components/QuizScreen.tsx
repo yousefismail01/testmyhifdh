@@ -11,13 +11,21 @@ import {
   getAyahsInRange,
   getJuzRange,
   getSurahRange,
+  getAyahsInJuzs,
   pickWeightedRandomAyah,
   type AyahReference,
 } from "../data/quran-meta";
-import type { SelectedRange } from "./RangeSelector";
+import {
+  type SelectedRange,
+  getSelectedJuzs,
+  formatJuzList,
+} from "../types/range";
+import { useDragSelect } from "../hooks/useDragSelect";
+import { useKeyboard } from "../hooks/useKeyboard";
 import type { Settings, SettingsActions } from "../App";
 import SettingsOverlay from "./SettingsOverlay";
 import AyahText from "./AyahText";
+import JuzCustomizer from "./JuzCustomizer";
 import { juzData } from "../data/quran-meta";
 import { ensurePageFont, getTajweedRuns } from "../data/quran-tajweed";
 import { useT } from "../i18n/useT";
@@ -34,23 +42,68 @@ function RangePopover({
   current,
   onApply,
   onClose,
+  onCustomize,
   language,
 }: {
   current: SelectedRange;
   onApply: (r: SelectedRange) => void;
   onClose: () => void;
+  onCustomize: (juzs: number[]) => void;
   language: Settings["language"];
 }) {
   const t = useT(language);
-  // The popover only edits juz/surah/page. If we land here from a custom
-  // selection (drill-down customizer), fall back to the underlying juz tab
-  // so the UI renders something meaningful; the user can re-customize from
-  // the home screen instead.
+  // The popover edits juz/surah/page. A custom selection falls back to the
+  // juz tab seeded with its origin juz(s) so the user can either re-pick
+  // or click Customize again.
   type SimpleMode = "juz" | "surah" | "page";
   const initialMode: SimpleMode =
     current.mode === "custom" ? "juz" : current.mode;
   const [mode, setMode] = useState<SimpleMode>(initialMode);
-  const [juzNumber, setJuzNumber] = useState(current.juzNumber ?? 30);
+  const [selectedJuzs, setSelectedJuzs] = useState<Set<number>>(() => {
+    const seeds = getSelectedJuzs(current);
+    return new Set(seeds.length > 0 ? seeds : [30]);
+  });
+  // Two-tap range fill: first unselected tap sets an anchor + adds the
+  // juz; second unselected tap unions every juz between anchor and tap
+  // into the selection. A tap on a selected juz deselects it (and any
+  // anchor is cleared).
+  const [juzAnchor, setJuzAnchor] = useState<number | null>(null);
+  const toggleJuz = (n: number) =>
+    setSelectedJuzs((prev) => {
+      const next = new Set(prev);
+      if (next.has(n)) {
+        next.delete(n);
+        setJuzAnchor(null);
+        return next;
+      }
+      if (juzAnchor === null) {
+        next.add(n);
+        setJuzAnchor(n);
+        return next;
+      }
+      const lo = Math.min(juzAnchor, n);
+      const hi = Math.max(juzAnchor, n);
+      for (let j = lo; j <= hi; j++) next.add(j);
+      setJuzAnchor(null);
+      return next;
+    });
+  const sortedJuzs = Array.from(selectedJuzs).sort((a, b) => a - b);
+
+  const setJuz = (n: number, selected: boolean) => {
+    setSelectedJuzs((prev) => {
+      const next = new Set(prev);
+      if (selected) next.add(n);
+      else next.delete(n);
+      return next;
+    });
+    setJuzAnchor(null);
+  };
+  const bindJuzDrag = useDragSelect<number>({
+    items: juzData.map((j) => j.number),
+    isSelected: (n) => selectedJuzs.has(n),
+    onTap: toggleJuz,
+    setItem: setJuz,
+  });
   const [startSurah, setStartSurah] = useState(current.startSurah ?? 1);
   const [endSurah, setEndSurah] = useState(current.endSurah ?? 1);
   const [startAyah, setStartAyah] = useState(current.startAyah ?? 1);
@@ -72,7 +125,7 @@ function RangePopover({
   );
 
   const apply = () => {
-    if (mode === "juz") onApply({ mode, juzNumber });
+    if (mode === "juz") onApply({ mode, juzNumbers: sortedJuzs });
     else if (mode === "surah")
       onApply({
         mode,
@@ -115,20 +168,68 @@ function RangePopover({
       </div>
 
       {mode === "juz" && (
-        <div className="grid grid-cols-6 gap-1">
-          {juzData.map((j) => (
+        <div>
+          <div className="flex items-baseline justify-end gap-3 mb-2">
+            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 tabular-nums">
+              {sortedJuzs.length}
+            </span>
             <button
-              key={j.number}
-              onClick={() => setJuzNumber(j.number)}
-              className={`py-2 rounded-lg text-xs font-medium transition-all duration-150 ${
-                juzNumber === j.number
-                  ? "bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900"
-                  : "bg-neutral-50 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700"
-              }`}
+              type="button"
+              onClick={() => {
+                setSelectedJuzs(new Set());
+                setJuzAnchor(null);
+              }}
+              disabled={sortedJuzs.length === 0}
+              className="text-[10px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors disabled:opacity-30 disabled:pointer-events-none"
             >
-              {j.number}
+              {t("clearAll")}
             </button>
-          ))}
+          </div>
+          <div className="grid grid-cols-6 gap-1 select-none touch-none">
+            {juzData.map((j) => {
+              const isSelected = selectedJuzs.has(j.number);
+              const isAnchor = juzAnchor === j.number;
+              return (
+                <button
+                  key={j.number}
+                  type="button"
+                  {...bindJuzDrag(j.number)}
+                  className={`py-2 rounded-lg text-xs font-medium transition-all duration-150 ${
+                    isAnchor
+                      ? "bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 ring-2 ring-amber-400 dark:ring-amber-300"
+                      : isSelected
+                      ? "bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900"
+                      : "bg-neutral-50 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                  }`}
+                >
+                  {j.number}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            onClick={() => {
+              onCustomize(sortedJuzs);
+              onClose();
+            }}
+            disabled={sortedJuzs.length === 0}
+            className="mt-2 w-full flex items-center justify-center gap-1.5 py-2 text-[11px] font-medium uppercase tracking-widest text-neutral-500 dark:text-neutral-400 bg-neutral-50 dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 hover:text-neutral-900 dark:hover:text-neutral-100 rounded-lg transition-all duration-150 disabled:opacity-40 disabled:pointer-events-none"
+          >
+            {t("customizeRange")}
+            <svg
+              className="w-3 h-3"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+          </button>
         </div>
       )}
 
@@ -276,7 +377,8 @@ function RangePopover({
         </button>
         <button
           onClick={apply}
-          className="flex-1 py-2 text-sm font-medium bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 rounded-lg transition-colors"
+          disabled={mode === "juz" && sortedJuzs.length === 0}
+          className="flex-1 py-2 text-sm font-medium bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 rounded-lg transition-colors disabled:opacity-40 disabled:pointer-events-none"
         >
           {t("apply")}
         </button>
@@ -323,12 +425,24 @@ export default function QuizScreen({
   };
   const [showSettings, setShowSettings] = useState(false);
   const [showRangePicker, setShowRangePicker] = useState(false);
+  const [customizing, setCustomizing] = useState<number[] | null>(null);
   const [promptOnly, setPromptOnly] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
   const rangeBounds = useMemo(() => {
     if (range.mode === "juz") {
-      return getJuzRange(range.juzNumber!);
+      const juzs = getSelectedJuzs(range);
+      if (juzs.length === 0)
+        return { startSurah: 1, startAyah: 1, endSurah: 1, endAyah: 1 };
+      if (juzs.length === 1) return getJuzRange(juzs[0]);
+      const first = getJuzRange(juzs[0]);
+      const last = getJuzRange(juzs[juzs.length - 1]);
+      return {
+        startSurah: first.startSurah,
+        startAyah: first.startAyah,
+        endSurah: last.endSurah,
+        endAyah: last.endAyah,
+      };
     }
     if (range.mode === "surah") {
       const base = getSurahRange(range.startSurah!, range.endSurah!);
@@ -378,19 +492,33 @@ export default function QuizScreen({
   }, [range]);
 
   const ayahPool = useMemo<AyahReference[]>(() => {
+    // Build the raw pool, then strip:
+    //   (a) the last ayah of any surah — nothing to reveal next, and the
+    //       reveal step would have to cross into the following surah which
+    //       changes the context.
+    //   (b) the last ayah of the user's selected range — if it got rolled
+    //       the reveal buttons would be disabled instantly (atRangeEnd
+    //       fires) so there'd be nothing to recite.
+    const isRangeEnd = (a: AyahReference) =>
+      a.surah === rangeBounds.endSurah && a.ayah === rangeBounds.endAyah;
+    const promptable = (a: AyahReference) =>
+      a.ayah < surahs[a.surah - 1].ayahCount && !isRangeEnd(a);
+
     if (range.mode === "custom") {
-      // Use the explicit custom selection. Strip the last ayah of any surah
-      // so the rolled prompt always has something to reveal next.
-      return (range.customAyahs ?? []).filter(
-        (a) => a.ayah < surahs[a.surah - 1].ayahCount
-      );
+      return (range.customAyahs ?? []).filter(promptable);
+    }
+    if (range.mode === "juz") {
+      // Union of every selected juz. Handles non-consecutive picks
+      // correctly (gap juzs are excluded from the roll pool).
+      const juzs = getSelectedJuzs(range);
+      return getAyahsInJuzs(juzs).filter(promptable);
     }
     return getAyahsInRange(
       rangeBounds.startSurah,
       rangeBounds.startAyah,
       rangeBounds.endSurah,
       rangeBounds.endAyah
-    ).filter((a) => a.ayah < surahs[a.surah - 1].ayahCount);
+    ).filter(promptable);
   }, [range, rangeBounds]);
 
   const warmFontsFor = (ref: AyahReference) => {
@@ -514,11 +642,63 @@ export default function QuizScreen({
     setRevealedAyahs((prev) => [...prev, ...newRevealed]);
   };
 
+  // Whether any modal/overlay owns the keyboard right now. While one is
+  // open, only "Escape" (handled by the overlays themselves) should fire.
+  const anyOverlayOpen =
+    showSettings || showRangePicker || customizing !== null;
+
+  useKeyboard(
+    {
+      // Reveal next ayah on Space or right/down arrow. Shift+Space jumps 10.
+      " ": (e) => {
+        e.preventDefault();
+        if (atRangeEnd) return;
+        if (e.shiftKey) revealRemainingPage();
+        else revealNext();
+      },
+      ArrowRight: (e) => {
+        e.preventDefault();
+        if (!atRangeEnd) revealNext();
+      },
+      ArrowDown: (e) => {
+        e.preventDefault();
+        if (!atRangeEnd) revealNext();
+      },
+      Enter: () => {
+        if (!atRangeEnd) revealRemainingPage();
+      },
+      n: () => rollNewAyah(),
+      r: () => rollNewAyah(),
+      Escape: () => onBack(),
+      Backspace: () => onBack(),
+      s: () => {
+        setShowSettings((v) => !v);
+        if (!showSettings) setShowRangePicker(false);
+      },
+      t: () =>
+        actions.setTheme(settings.theme === "dark" ? "light" : "dark"),
+    },
+    !anyOverlayOpen
+  );
+
+  // When an overlay is open, Escape closes it (highest priority first).
+  useKeyboard(
+    {
+      Escape: () => {
+        if (customizing !== null) setCustomizing(null);
+        else if (showRangePicker) setShowRangePicker(false);
+        else if (showSettings) setShowSettings(false);
+      },
+    },
+    anyOverlayOpen
+  );
+
   const getRangeLabel = () => {
-    if (range.mode === "juz") return `Juz ${range.juzNumber}`;
+    if (range.mode === "juz") return formatJuzList(getSelectedJuzs(range));
     if (range.mode === "custom") {
       const count = range.customAyahs?.length ?? 0;
-      const base = range.juzNumber ? `Juz ${range.juzNumber}` : t("customLabel");
+      const juzs = getSelectedJuzs(range);
+      const base = juzs.length > 0 ? formatJuzList(juzs) : t("customLabel");
       return `${base} · ${count}`;
     }
     if (range.mode === "surah") {
@@ -611,6 +791,22 @@ export default function QuizScreen({
         settings={settings}
         actions={actions}
       />
+      {customizing !== null && (
+        <JuzCustomizer
+          juzNumbers={customizing}
+          language={language}
+          onCancel={() => setCustomizing(null)}
+          onApply={(customAyahs) => {
+            const juzs = customizing;
+            setCustomizing(null);
+            onRangeChange({
+              mode: "custom",
+              juzNumbers: juzs,
+              customAyahs,
+            });
+          }}
+        />
+      )}
       <div className="max-w-2xl mx-auto w-full px-4 pt-4 pb-4 flex flex-col flex-1 min-h-0">
         <div className="relative z-50 flex items-center justify-between pb-4 shrink-0">
           <button
@@ -700,6 +896,7 @@ export default function QuizScreen({
             current={range}
             onApply={onRangeChange}
             onClose={() => setShowRangePicker(false)}
+            onCustomize={(juzs) => setCustomizing(juzs)}
             language={language}
           />
         )}

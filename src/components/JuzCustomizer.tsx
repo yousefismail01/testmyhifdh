@@ -1,15 +1,18 @@
 import { useMemo, useState } from "react";
 import {
   surahs,
-  getJuzSurahs,
+  getJuzsSurahs,
   type AyahReference,
   type JuzSurahSegment,
 } from "../data/quran-meta";
 import type { Language } from "../i18n/translations";
 import { useT } from "../i18n/useT";
+import { useDragSelect } from "../hooks/useDragSelect";
+import { useKeyboard } from "../hooks/useKeyboard";
 
 interface Props {
-  juzNumber: number;
+  /** Sorted-ascending list of juz numbers to customize. */
+  juzNumbers: number[];
   language: Language;
   onCancel: () => void;
   onApply: (customAyahs: AyahReference[]) => void;
@@ -39,24 +42,26 @@ type View =
  *   - "Select all" / "Clear" buttons operate on the visible surah segment.
  */
 export default function JuzCustomizer({
-  juzNumber,
+  juzNumbers,
   language,
   onCancel,
   onApply,
 }: Props) {
   const t = useT(language);
-  const segments = useMemo<JuzSurahSegment[]>(
-    () => getJuzSurahs(juzNumber),
-    [juzNumber]
+  const { segments, coveredAyahs } = useMemo(
+    () => getJuzsSurahs(juzNumbers),
+    [juzNumbers]
   );
 
-  // Initialize selection: every ayah in the juz selected.
+  // Initialize selection: every ayah actually covered by the chosen juz(s).
+  // For consecutive juzs this matches the segment span; for a non-consecutive
+  // pick (e.g. juz 1 + juz 3) the segment span covers in-between ayahs but
+  // they start unchecked so the user must opt them in.
   const [selection, setSelection] = useState<Map<number, Set<number>>>(() => {
     const m = new Map<number, Set<number>>();
     for (const seg of segments) {
-      const s = new Set<number>();
-      for (let a = seg.startAyah; a <= seg.endAyah; a++) s.add(a);
-      m.set(seg.surah, s);
+      const covered = coveredAyahs.get(seg.surah);
+      m.set(seg.surah, covered ? new Set(covered) : new Set());
     }
     return m;
   });
@@ -126,6 +131,22 @@ export default function JuzCustomizer({
     });
   };
 
+  const setAyahAt = (
+    surahNumber: number,
+    ayah: number,
+    selected: boolean
+  ) => {
+    setSelection((prev) => {
+      const next = new Map(prev);
+      const current = new Set(next.get(surahNumber) ?? []);
+      if (selected) current.add(ayah);
+      else current.delete(ayah);
+      next.set(surahNumber, current);
+      return next;
+    });
+    setAnchor(null);
+  };
+
   const selectAllInSurah = (surahNumber: number) => {
     const seg = segmentBySurah.get(surahNumber);
     if (!seg) return;
@@ -170,6 +191,24 @@ export default function JuzCustomizer({
     setView({ kind: "surahs" });
   };
 
+  // Keyboard shortcuts:
+  //   Escape       Step back (ayah view → surah list → cancel) — same
+  //                semantics as tapping the back arrow in the header.
+  //   Enter        Apply (begin with the current selection), when the
+  //                surah list is showing and at least one ayah is
+  //                selected. In the ayah view Enter steps back to the
+  //                surah list — matching the back-button affordance.
+  useKeyboard({
+    Escape: () => {
+      if (view.kind === "ayahs") backToSurahs();
+      else onCancel();
+    },
+    Enter: () => {
+      if (view.kind === "ayahs") backToSurahs();
+      else if (totalSelected > 0) applyAndStart();
+    },
+  });
+
   return (
     <div
       className="fixed inset-0 z-[60] bg-white dark:bg-neutral-950 animate-fade-in flex flex-col"
@@ -200,9 +239,15 @@ export default function JuzCustomizer({
             </svg>
             {t("back")}
           </button>
-          <div className="text-sm font-medium text-neutral-700 dark:text-neutral-200">
+          <div className="text-sm font-medium text-neutral-700 dark:text-neutral-200 truncate px-2">
             {view.kind === "surahs"
-              ? `Juz ${juzNumber}`
+              ? juzNumbers.length === 1
+                ? `Juz ${juzNumbers[0]}`
+                : juzNumbers.length <= 3
+                ? `Juz ${juzNumbers.join(", ")}`
+                : `Juz ${juzNumbers.slice(0, 2).join(", ")} +${
+                    juzNumbers.length - 2
+                  }`
               : surahs[view.surah - 1].name}
           </div>
           <div className="text-xs text-neutral-400 dark:text-neutral-500 tabular-nums w-12 text-right">
@@ -225,6 +270,7 @@ export default function JuzCustomizer({
               selected={selection.get(view.surah) ?? new Set()}
               anchor={anchor}
               onTap={(a) => handleAyahTap(view.surah, a)}
+              setAyah={(a, sel) => setAyahAt(view.surah, a, sel)}
               onSelectAll={() => selectAllInSurah(view.surah)}
               onClear={() => clearSurah(view.surah)}
               hint={t("tapTwoHint")}
@@ -354,6 +400,7 @@ function AyahGrid({
   selected,
   anchor,
   onTap,
+  setAyah,
   onSelectAll,
   onClear,
   hint,
@@ -364,6 +411,7 @@ function AyahGrid({
   selected: Set<number>;
   anchor: number | null;
   onTap: (ayah: number) => void;
+  setAyah: (ayah: number, selected: boolean) => void;
   onSelectAll: () => void;
   onClear: () => void;
   hint: string;
@@ -372,6 +420,12 @@ function AyahGrid({
 }) {
   const ayahs: number[] = [];
   for (let a = segment.startAyah; a <= segment.endAyah; a++) ayahs.push(a);
+  const bindDrag = useDragSelect<number>({
+    items: ayahs,
+    isSelected: (a) => selected.has(a),
+    onTap,
+    setItem: setAyah,
+  });
 
   return (
     <div className="flex flex-col gap-3">
@@ -392,14 +446,15 @@ function AyahGrid({
           {clearLabel}
         </button>
       </div>
-      <div className="grid grid-cols-6 sm:grid-cols-8 gap-1.5">
+      <div className="grid grid-cols-6 sm:grid-cols-8 gap-1.5 select-none touch-none">
         {ayahs.map((a) => {
           const isSelected = selected.has(a);
           const isAnchor = anchor === a;
           return (
             <button
               key={a}
-              onClick={() => onTap(a)}
+              type="button"
+              {...bindDrag(a)}
               className={`py-2.5 rounded-lg text-xs font-medium tabular-nums transition-all duration-150 ${
                 isAnchor
                   ? "ring-2 ring-amber-400 dark:ring-amber-300 bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900"

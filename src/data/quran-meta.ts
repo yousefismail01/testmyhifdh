@@ -230,6 +230,82 @@ export function getJuzSurahs(juzNumber: number): JuzSurahSegment[] {
   return segments;
 }
 
+/**
+ * Combined view of multiple juzs as a single sorted list of surah
+ * segments, plus the set of ayahs actually covered. For consecutive
+ * juzs this is identical to the single-juz output. For non-consecutive
+ * juzs (e.g. juz 1 + juz 3) a surah that appears in both juzs gets a
+ * segment span from the lowest-startAyah to the highest-endAyah; the
+ * `coveredAyahs` map records the actual union so the customizer can
+ * initialize its selection precisely.
+ */
+export interface JuzsCombined {
+  segments: JuzSurahSegment[];
+  coveredAyahs: Map<number, Set<number>>; // surah → set of ayah numbers
+}
+
+export function getJuzsSurahs(juzNumbers: number[]): JuzsCombined {
+  const perSurah = new Map<
+    number,
+    { startAyah: number; endAyah: number; ayahs: Set<number> }
+  >();
+  for (const n of juzNumbers) {
+    for (const seg of getJuzSurahs(n)) {
+      const existing = perSurah.get(seg.surah);
+      const ayahs = existing ? existing.ayahs : new Set<number>();
+      for (let a = seg.startAyah; a <= seg.endAyah; a++) ayahs.add(a);
+      if (existing) {
+        existing.startAyah = Math.min(existing.startAyah, seg.startAyah);
+        existing.endAyah = Math.max(existing.endAyah, seg.endAyah);
+      } else {
+        perSurah.set(seg.surah, {
+          startAyah: seg.startAyah,
+          endAyah: seg.endAyah,
+          ayahs,
+        });
+      }
+    }
+  }
+  const sorted = Array.from(perSurah.entries()).sort((a, b) => a[0] - b[0]);
+  const segments = sorted.map(([surah, info]) => ({
+    surah,
+    startAyah: info.startAyah,
+    endAyah: info.endAyah,
+    totalAyahs: surahs[surah - 1].ayahCount,
+    segmentCount: info.endAyah - info.startAyah + 1,
+  }));
+  const coveredAyahs = new Map<number, Set<number>>();
+  for (const [surah, info] of sorted) coveredAyahs.set(surah, info.ayahs);
+  return { segments, coveredAyahs };
+}
+
+/**
+ * Returns every ayah covered by the union of selected juzs, sorted by
+ * (surah, ayah). Each ayah appears exactly once.
+ */
+export function getAyahsInJuzs(juzNumbers: number[]): AyahReference[] {
+  if (juzNumbers.length === 0) return [];
+  const seen = new Set<string>();
+  const refs: AyahReference[] = [];
+  for (const n of juzNumbers) {
+    const r = getJuzRange(n);
+    for (const a of getAyahsInRange(
+      r.startSurah,
+      r.startAyah,
+      r.endSurah,
+      r.endAyah
+    )) {
+      const k = `${a.surah}:${a.ayah}`;
+      if (!seen.has(k)) {
+        seen.add(k);
+        refs.push(a);
+      }
+    }
+  }
+  refs.sort((a, b) => a.surah - b.surah || a.ayah - b.ayah);
+  return refs;
+}
+
 export function getSurahRange(from: number, to: number) {
   return {
     startSurah: from,

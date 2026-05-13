@@ -1,45 +1,109 @@
 import { useState } from "react";
-import { surahs, juzData, type AyahReference } from "../data/quran-meta";
+import { surahs, juzData } from "../data/quran-meta";
 import type { Settings, SettingsActions } from "../App";
 import SettingsOverlay from "./SettingsOverlay";
 import JuzCustomizer from "./JuzCustomizer";
 import { useT } from "../i18n/useT";
+import { useDragSelect } from "../hooks/useDragSelect";
+import { useKeyboard } from "../hooks/useKeyboard";
+import {
+  type RangeMode,
+  type SelectedRange,
+  getSelectedJuzs,
+} from "../types/range";
 
-export type RangeMode = "surah" | "juz" | "page" | "custom";
-
-export interface SelectedRange {
-  mode: RangeMode;
-  startSurah?: number;
-  endSurah?: number;
-  startAyah?: number;
-  endAyah?: number;
-  juzNumber?: number;
-  startPage?: number;
-  endPage?: number;
-  // Custom mode: an explicit list of ayahs (sorted by surah, then ayah).
-  // Built via the juz drill-down customizer. The juzNumber field is also
-  // set so the range pill can label the custom selection by its origin.
-  customAyahs?: AyahReference[];
-}
+export type { RangeMode, SelectedRange };
 
 interface Props {
   onStart: (range: SelectedRange) => void;
   settings: Settings;
   actions: SettingsActions;
+  /**
+   * Last range chosen by the user. Used to re-seed picker state so the
+   * back button on the quiz screen doesn't lose their selection.
+   */
+  initialRange?: SelectedRange | null;
 }
 
-export default function RangeSelector({ onStart, settings, actions }: Props) {
+export default function RangeSelector({
+  onStart,
+  settings,
+  actions,
+  initialRange,
+}: Props) {
   const t = useT(settings.language);
-  const [mode, setMode] = useState<RangeMode>("juz");
-  const [juzNumber, setJuzNumber] = useState(30);
-  const [startSurah, setStartSurah] = useState(1);
-  const [endSurah, setEndSurah] = useState(1);
-  const [startAyah, setStartAyah] = useState(1);
-  const [endAyah, setEndAyah] = useState(7);
-  const [startPage, setStartPage] = useState(1);
-  const [endPage, setEndPage] = useState(20);
+  // Seed picker state from the previous range (if any) on first mount.
+  // After mount we ignore further changes to initialRange so user edits
+  // in the picker aren't clobbered when App updates lastRange.
+  const seedMode: RangeMode = (() => {
+    if (!initialRange) return "juz";
+    // Custom mode falls back to juz so the picker tabs render meaningfully.
+    return initialRange.mode === "custom" ? "juz" : initialRange.mode;
+  })();
+  const seedJuzs: number[] = initialRange
+    ? getSelectedJuzs(initialRange)
+    : [30];
+
+  const [mode, setMode] = useState<RangeMode>(seedMode);
+  const [selectedJuzs, setSelectedJuzs] = useState<Set<number>>(
+    () => new Set(seedJuzs.length > 0 ? seedJuzs : [30])
+  );
+  const [startSurah, setStartSurah] = useState(initialRange?.startSurah ?? 1);
+  const [endSurah, setEndSurah] = useState(initialRange?.endSurah ?? 1);
+  const [startAyah, setStartAyah] = useState(initialRange?.startAyah ?? 1);
+  const [endAyah, setEndAyah] = useState(initialRange?.endAyah ?? 7);
+  const [startPage, setStartPage] = useState(initialRange?.startPage ?? 1);
+  const [endPage, setEndPage] = useState(initialRange?.endPage ?? 20);
   const [showSettings, setShowSettings] = useState(false);
-  const [customizingJuz, setCustomizingJuz] = useState<number | null>(null);
+  const [customizing, setCustomizing] = useState<number[] | null>(null);
+  // Anchor for two-tap range fill on the juz grid. First tap on an
+  // unselected juz sets the anchor and adds that juz; a second tap on
+  // another unselected juz unions every juz between the anchor and the
+  // tap into the selection. Tapping a selected juz deselects it and
+  // clears the anchor.
+  const [juzAnchor, setJuzAnchor] = useState<number | null>(null);
+
+  const toggleJuz = (n: number) => {
+    setSelectedJuzs((prev) => {
+      const next = new Set(prev);
+      if (next.has(n)) {
+        // Tap on a selected juz → deselect. Empty selection is allowed;
+        // the Begin / Customize buttons disable when nothing is picked.
+        next.delete(n);
+        setJuzAnchor(null);
+        return next;
+      }
+      // Tap on an unselected juz.
+      if (juzAnchor === null) {
+        next.add(n);
+        setJuzAnchor(n);
+        return next;
+      }
+      // Anchor exists → fill range, union into existing selection.
+      const lo = Math.min(juzAnchor, n);
+      const hi = Math.max(juzAnchor, n);
+      for (let j = lo; j <= hi; j++) next.add(j);
+      setJuzAnchor(null);
+      return next;
+    });
+  };
+  const sortedJuzs = Array.from(selectedJuzs).sort((a, b) => a - b);
+
+  const setJuz = (n: number, selected: boolean) => {
+    setSelectedJuzs((prev) => {
+      const next = new Set(prev);
+      if (selected) next.add(n);
+      else next.delete(n);
+      return next;
+    });
+    setJuzAnchor(null);
+  };
+  const bindJuzDrag = useDragSelect<number>({
+    items: juzData.map((j) => j.number),
+    isSelected: (n) => selectedJuzs.has(n),
+    onTap: toggleJuz,
+    setItem: setJuz,
+  });
 
   const startSurahInfo = surahs[startSurah - 1];
   const endSurahInfo = surahs[endSurah - 1];
@@ -54,7 +118,8 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
 
   const handleStart = () => {
     if (mode === "juz") {
-      onStart({ mode, juzNumber });
+      if (sortedJuzs.length === 0) return;
+      onStart({ mode, juzNumbers: sortedJuzs });
     } else if (mode === "surah") {
       const finalEndSurah = Math.max(startSurah, endSurah);
       onStart({
@@ -72,6 +137,29 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
       });
     }
   };
+
+  // Keyboard shortcuts on the home screen.
+  //   1/2/3        switch to juz / surah / page tab
+  //   Enter        Begin (when not focused on an input)
+  //   t            toggle theme
+  //   s            toggle settings overlay
+  //   Escape       close settings overlay (if open)
+  useKeyboard(
+    {
+      Enter: () => handleStart(),
+      "1": () => setMode("juz"),
+      "2": () => setMode("surah"),
+      "3": () => setMode("page"),
+      t: () =>
+        actions.setTheme(settings.theme === "dark" ? "light" : "dark"),
+      s: () => setShowSettings((v) => !v),
+      Escape: () => {
+        if (customizing !== null) setCustomizing(null);
+        else if (showSettings) setShowSettings(false);
+      },
+    },
+    customizing === null
+  );
 
   const tabs: { value: RangeMode; label: string }[] = [
     { value: "juz", label: t("tabJuz") },
@@ -92,26 +180,29 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
         onClose={() => setShowSettings(false)}
         settings={settings}
         actions={actions}
+        containerWidth="max-w-lg"
       />
-      {customizingJuz !== null && (
+      {customizing !== null && (
         <JuzCustomizer
-          juzNumber={customizingJuz}
+          juzNumbers={customizing}
           language={settings.language}
-          onCancel={() => setCustomizingJuz(null)}
+          onCancel={() => setCustomizing(null)}
           onApply={(customAyahs) => {
-            setCustomizingJuz(null);
+            const juzs = customizing;
+            setCustomizing(null);
             onStart({
               mode: "custom",
-              juzNumber: customizingJuz,
+              juzNumbers: juzs,
               customAyahs,
             });
           }}
         />
       )}
       <div
-        className="absolute z-50 flex gap-2 end-4 start-4 justify-end"
+        className="absolute z-50 inset-x-0 px-4 flex justify-center pointer-events-none"
         style={{ top: "max(1rem, env(safe-area-inset-top))" }}
       >
+        <div className="w-full max-w-lg flex justify-end gap-2 pointer-events-auto">
           <button
             onClick={() =>
               actions.setTheme(settings.theme === "dark" ? "light" : "dark")
@@ -178,6 +269,7 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
             </svg>
           </button>
         </div>
+      </div>
 
       <div className="w-full max-w-lg">
         <div className="text-center mb-12 animate-slide-up">
@@ -212,27 +304,53 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
           <div key={mode} className="animate-fade-in-soft">
             {mode === "juz" && (
               <div>
-                <label className="block text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500 mb-3">
-                  {t("selectJuz")}
-                </label>
-                <div className="grid grid-cols-6 gap-1.5">
-                  {juzData.map((j) => (
+                <div className="flex items-baseline justify-between mb-3 gap-3">
+                  <label className="block text-xs uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
+                    {t("selectJuz")}
+                  </label>
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-[11px] text-neutral-400 dark:text-neutral-500 tabular-nums">
+                      {sortedJuzs.length}
+                    </span>
                     <button
-                      key={j.number}
-                      onClick={() => setJuzNumber(j.number)}
-                      className={`py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
-                        juzNumber === j.number
-                          ? "bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900"
-                          : "bg-neutral-50 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700"
-                      }`}
+                      type="button"
+                      onClick={() => {
+                        setSelectedJuzs(new Set());
+                        setJuzAnchor(null);
+                      }}
+                      disabled={sortedJuzs.length === 0}
+                      className="text-[11px] uppercase tracking-widest text-neutral-400 dark:text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors disabled:opacity-30 disabled:pointer-events-none"
                     >
-                      {j.number}
+                      {t("clearAll")}
                     </button>
-                  ))}
+                  </div>
+                </div>
+                <div className="grid grid-cols-6 gap-1.5 select-none touch-none">
+                  {juzData.map((j) => {
+                    const isSelected = selectedJuzs.has(j.number);
+                    const isAnchor = juzAnchor === j.number;
+                    return (
+                      <button
+                        key={j.number}
+                        type="button"
+                        {...bindJuzDrag(j.number)}
+                        className={`py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
+                          isAnchor
+                            ? "bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 ring-2 ring-amber-400 dark:ring-amber-300"
+                            : isSelected
+                            ? "bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900"
+                            : "bg-neutral-50 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                        }`}
+                      >
+                        {j.number}
+                      </button>
+                    );
+                  })}
                 </div>
                 <button
-                  onClick={() => setCustomizingJuz(juzNumber)}
-                  className="mt-3 w-full flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium uppercase tracking-widest text-neutral-500 dark:text-neutral-400 bg-neutral-50 dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 hover:text-neutral-900 dark:hover:text-neutral-100 rounded-xl transition-all duration-150"
+                  onClick={() => setCustomizing(sortedJuzs)}
+                  disabled={sortedJuzs.length === 0}
+                  className="mt-3 w-full flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium uppercase tracking-widest text-neutral-500 dark:text-neutral-400 bg-neutral-50 dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 hover:text-neutral-900 dark:hover:text-neutral-100 rounded-xl transition-all duration-150 disabled:opacity-40 disabled:pointer-events-none"
                 >
                   {t("customizeRange")}
                   <svg
@@ -397,7 +515,8 @@ export default function RangeSelector({ onStart, settings, actions }: Props) {
 
           <button
             onClick={handleStart}
-            className="w-full mt-6 py-3.5 bg-neutral-900 dark:bg-neutral-100 hover:bg-neutral-800 dark:hover:bg-neutral-200 text-white dark:text-neutral-900 font-medium rounded-xl transition-all duration-200 active:scale-[0.99]"
+            disabled={mode === "juz" && sortedJuzs.length === 0}
+            className="w-full mt-6 py-3.5 bg-neutral-900 dark:bg-neutral-100 hover:bg-neutral-800 dark:hover:bg-neutral-200 text-white dark:text-neutral-900 font-medium rounded-xl transition-all duration-200 active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none"
           >
             {t("begin")}
           </button>
