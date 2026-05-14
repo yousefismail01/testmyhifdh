@@ -43,7 +43,9 @@ import {
 } from "../lib/audio-gain";
 import AyahTranslation from "./AyahTranslation";
 import TranslationHint from "./TranslationHint";
-import QuizSidebar from "./QuizSidebar";
+// QuizSidebar removed — hint card and similar-verses now render
+// inline beneath the reveal stream / each ayah card on every
+// breakpoint.
 import AyahSimilarHint from "./AyahSimilarHint";
 import { getSimilarAyahs, isSimilarReady, loadSimilar } from "../data/similar-ayahs";
 import {
@@ -1163,7 +1165,7 @@ export default function QuizScreen({
         onClose={() => setShowSettings(false)}
         settings={settings}
         actions={actions}
-        containerWidth="max-w-2xl lg:max-w-6xl"
+        containerWidth="max-w-2xl lg:max-w-3xl"
       />
       {customizing !== null && (
         <JuzCustomizer
@@ -1193,12 +1195,12 @@ export default function QuizScreen({
         settings={settings}
         actions={actions}
         language={language}
-        containerWidth="max-w-2xl lg:max-w-6xl"
+        containerWidth="max-w-2xl lg:max-w-3xl"
       />
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {liveAnnouncement}
       </div>
-      <div className="max-w-2xl lg:max-w-6xl mx-auto w-full px-4 pt-4 pb-4 flex flex-col flex-1 min-h-0">
+      <div className="max-w-2xl lg:max-w-3xl mx-auto w-full px-4 pt-4 pb-4 flex flex-col flex-1 min-h-0">
         <div className="relative z-50 flex items-center justify-between pb-4 shrink-0">
           <button
             onClick={onBack}
@@ -1327,7 +1329,7 @@ export default function QuizScreen({
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="mx-auto w-full max-w-2xl lg:max-w-6xl pointer-events-auto lg:flex lg:justify-end">
+              <div className="mx-auto w-full max-w-2xl lg:max-w-3xl pointer-events-auto lg:flex lg:justify-end">
                 <div className="w-full lg:max-w-md">
                   <RangePopover
                     current={range}
@@ -1352,15 +1354,10 @@ export default function QuizScreen({
             key={currentAyah ? `${currentAyah.surah}:${currentAyah.ayah}` : "x"}
             className="flex flex-col flex-1 min-h-0"
           >
-            {/* Wide-screen split: reveal reel on the left, contextual
-                sidebar on the right. On phones/tablets the sidebar
-                collapses (display: none) and the inline translation /
-                similar / hint cards under each ayah take over. */}
-            <div className="flex flex-col lg:flex-row lg:gap-6 flex-1 min-h-0">
             <div
               ref={scrollerRef}
               onScroll={updateWheel}
-              className="reveal-mask scrollbar-hide flex-1 min-h-0 overflow-y-auto -mx-4 px-4 lg:mx-0 lg:px-0"
+              className="reveal-mask scrollbar-hide flex-1 min-h-0 overflow-y-auto -mx-4 px-4"
             >
               <div className="flex flex-col gap-6 pt-12 pb-12">
                 {currentAyah &&
@@ -1500,13 +1497,11 @@ export default function QuizScreen({
                                 />
                               )}
                               {showSimilarPhrases && (
-                                <div className="lg:hidden">
-                                  <AyahSimilarHint
-                                    surah={currentAyah.surah}
-                                    ayah={currentAyah.ayah}
-                                    language={language}
-                                  />
-                                </div>
+                                <AyahSimilarHint
+                                  surah={currentAyah.surah}
+                                  ayah={currentAyah.ayah}
+                                  language={language}
+                                />
                               )}
                             </>
                           )}
@@ -1639,13 +1634,11 @@ export default function QuizScreen({
                               />
                             )}
                             {showSimilarPhrases && (
-                              <div className="lg:hidden">
-                                <AyahSimilarHint
-                                  surah={ra.surah}
-                                  ayah={ra.ayah}
-                                  language={language}
-                                />
-                              </div>
+                              <AyahSimilarHint
+                                surah={ra.surah}
+                                ayah={ra.ayah}
+                                language={language}
+                              />
                             )}
                           </>
                         )}
@@ -1662,7 +1655,7 @@ export default function QuizScreen({
                     stream so it sits where the user's eyes are. */}
                 {hintTarget &&
                   (hintFirstWordCount > 0 || hintTranslationStep > 0) && (
-                    <div className="lg:hidden bg-amber-50/60 dark:bg-amber-950/20 rounded-3xl border border-amber-200/60 dark:border-amber-900/40 p-5 animate-fade-in-soft">
+                    <div className="bg-amber-50/60 dark:bg-amber-950/20 rounded-3xl border border-amber-200/60 dark:border-amber-900/40 p-5 animate-fade-in-soft">
                       <div className="text-[10px] uppercase tracking-widest text-amber-700 dark:text-amber-300 mb-3 flex items-center gap-1.5">
                         <svg
                           className="w-3 h-3"
@@ -1706,18 +1699,6 @@ export default function QuizScreen({
               </div>
             </div>
 
-            <QuizSidebar
-              lastShown={lastShown}
-              hintTarget={hintTarget}
-              language={language}
-              tajweed={tajweed}
-              fontSize={fontSize}
-              showSimilarPhrases={showSimilarPhrases}
-              hintFirstWordCount={hintFirstWordCount}
-              hintTranslationStep={hintTranslationStep}
-              hintTranslationWordsPerStep={HINT_TRANSLATION_WORDS_PER_STEP}
-            />
-            </div>
 
             <div className="shrink-0 pt-3 relative">
               {hintMenuOpen && hintTarget && (

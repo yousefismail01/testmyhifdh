@@ -52,6 +52,14 @@ body {
 .qpc-page-text {
   overflow-wrap: break-word;
   word-break: normal;
+  /* QPC v4 PUA codepoints (FC00–FDFF range) are already-shaped word
+   * glyphs — no contextual joining or ligature processing needed.
+   * Without this override, the browser's Arabic shaper occasionally
+   * applies `calt` / `liga` to adjacent PUA codepoints across word
+   * boundaries (e.g. An-Naba 78:31) and collapses the gap, making
+   * words visually overlap. Disabling those features keeps every PUA
+   * glyph rendered at its own native advance. */
+  font-feature-settings: "calt" off, "liga" off;
 }
 .qpc-plain {
   font-palette: --qpc-plain;
