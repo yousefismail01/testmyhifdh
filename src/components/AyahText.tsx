@@ -80,12 +80,24 @@ export default function AyahText({
       }
       processed = out;
     }
-    if (showMarker || processed.length === 0) return processed;
-    const last = processed[processed.length - 1];
-    const trimmed = last.t.replace(/.\s*$/u, "");
-    if (trimmed === last.t) return processed;
-    if (trimmed.length === 0) return processed.slice(0, -1);
-    return [...processed.slice(0, -1), { p: last.p, t: trimmed }];
+    if (!showMarker && processed.length > 0) {
+      const last = processed[processed.length - 1];
+      const trimmed = last.t.replace(/.\s*$/u, "");
+      if (trimmed !== last.t) {
+        if (trimmed.length === 0) processed = processed.slice(0, -1);
+        else processed = [...processed.slice(0, -1), { p: last.p, t: trimmed }];
+      }
+    }
+    // Replace zero-width word separator with a real U+0020 space.
+    // QPC v4 PUA word glyphs have no trailing whitespace in their
+    // metrics — adjacent words touch when the separator is zero-
+    // width. A regular space gives them natural visual gap and still
+    // allows line-breaking. Highlight-rect measurement reads from the
+    // rendered text node, so character offsets stay accurate.
+    return processed.map((r) => ({
+      p: r.p,
+      t: r.t.split(ZWSP).join(" "),
+    }));
   }, [surah, ayah, showMarker, wordLimit]);
 
   useEffect(() => {
@@ -143,17 +155,18 @@ function HighlightedRender({
   const runRefs = useRef<Array<HTMLSpanElement | null>>([]);
   const [hl, setHl] = useState<HLRect | null>(null);
 
-  // Per-run char ranges for each word. Words are ZWSP-separated; we
-  // record [start, end) into the run's full text so the Range API
-  // can select exactly the word's characters without disturbing
-  // glyph shaping.
+  // Per-run char ranges for each word. Words are space-separated in
+  // the rendered text (we replace the data's ZWSP with U+0020 above
+  // for visible gap). We record [start, end) into the run's text so
+  // the Range API can select exactly the word's characters without
+  // disturbing glyph shaping.
   const charRanges = useMemo(
     () =>
       runs.map((run) => {
         const ranges: Array<[number, number]> = [];
         let start = 0;
         for (let i = 0; i < run.t.length; i++) {
-          if (run.t[i] === ZWSP) {
+          if (run.t[i] === " ") {
             ranges.push([start, i]);
             start = i + 1;
           }
